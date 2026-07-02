@@ -86,15 +86,18 @@ export const api = {
       collected: number;
     }>('/api/users/me'),
 
-  // Admin
-  getAdminStats: (adminToken: string) =>
+  // Admin (protected by JWT — only users with is_admin=true)
+  getAdminStats: () =>
     request<{
       user_count: number;
       fish_count: number;
       photo_count: number;
       photo_size_mb: number;
-    }>('/api/admin/stats', {
-      headers: { 'X-Admin-Token': adminToken },
+    }>('/api/admin/stats'),
+
+  promoteUser: (username: string) =>
+    request(`/api/admin/promote?username=${encodeURIComponent(username)}`, {
+      method: 'POST',
     }),
 
   // Leaderboard

@@ -106,12 +106,17 @@ func main() {
 
 			// User stats
 			r.Get("/users/me", userH.Me)
-		})
 
-		// Admin endpoints (protected by X-Admin-Token)
-		r.Post("/admin/approve-user", adminH.ApproveUser)
-		r.Post("/admin/toggle-upload-mode", adminH.ToggleGalleryUpload)
-		r.Get("/admin/stats", adminH.Stats)
+			// Admin-only endpoints
+			r.Group(func(r chi.Router) {
+				r.Use(middleware.RequireAdmin)
+
+				r.Post("/admin/approve-user", adminH.ApproveUser)
+				r.Post("/admin/toggle-upload-mode", adminH.ToggleGalleryUpload)
+				r.Get("/admin/stats", adminH.Stats)
+			r.Post("/admin/promote", adminH.PromoteUser)
+			})
+		})
 	})
 
 	// Start server
@@ -125,7 +130,7 @@ func corsMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Access-Control-Allow-Origin", "*")
 		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
-		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Admin-Token, X-Live-Capture")
+		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Live-Capture")
 		if r.Method == "OPTIONS" {
 			w.WriteHeader(http.StatusOK)
 			return

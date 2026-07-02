@@ -2,7 +2,6 @@ import { useState, useEffect } from 'preact/hooks';
 import { api } from '../api';
 
 export function AdminStatsPage() {
-  const [token, setToken] = useState(localStorage.getItem('admin_token') || '');
   const [stats, setStats] = useState<{
     user_count: number;
     fish_count: number;
@@ -10,19 +9,22 @@ export function AdminStatsPage() {
     photo_size_mb: number;
   } | null>(null);
   const [error, setError] = useState('');
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
+
+  // Promote state
+  const [promoteUser, setPromoteUser] = useState('');
+  const [promoteMsg, setPromoteMsg] = useState('');
+  const [promoteErr, setPromoteErr] = useState('');
+  const [promoting, setPromoting] = useState(false);
+
+  useEffect(() => { loadStats(); }, []);
 
   async function loadStats() {
-    if (!token.trim()) {
-      setError('Wprowadź admin token.');
-      return;
-    }
-    setError('');
     setLoading(true);
+    setError('');
     try {
-      const s = await api.getAdminStats(token.trim());
+      const s = await api.getAdminStats();
       setStats(s);
-      localStorage.setItem('admin_token', token.trim());
     } catch (err: any) {
       setError(err.message);
       setStats(null);
@@ -31,30 +33,40 @@ export function AdminStatsPage() {
     }
   }
 
-  // Auto-load on mount if token is saved
-  useEffect(() => {
-    if (token.trim()) loadStats();
-  }, []);
+  async function handlePromote(e: Event) {
+    e.preventDefault();
+    const name = promoteUser.trim();
+    if (!name) return;
+    setPromoteErr('');
+    setPromoteMsg('');
+    setPromoting(true);
+    try {
+      const res: any = await api.promoteUser(name);
+      setPromoteMsg(res.message || 'Promoted!');
+      setPromoteUser('');
+      loadStats(); // refresh counts
+    } catch (err: any) {
+      setPromoteErr(err.message);
+    } finally {
+      setPromoting(false);
+    }
+  }
+
+  if (loading) return <div class="page"><p class="loading-text">Ładowanie…</p></div>;
+
+  if (error) {
+    return (
+      <div class="page">
+        <h2>🔑 Admin Panel</h2>
+        <p class="error-msg">{error}</p>
+        <p style="text-align:center;color:#999;">Tylko administratorzy mają dostęp.</p>
+      </div>
+    );
+  }
 
   return (
     <div class="page">
       <h2>🔑 Admin Panel</h2>
-
-      <div style="display:flex;gap:8px;margin-bottom:16px;">
-        <input
-          class="input"
-          type="password"
-          placeholder="Admin token"
-          value={token}
-          onInput={(e: any) => setToken(e.target.value)}
-          style="margin-bottom:0;flex:1;"
-        />
-        <button class="btn btn-primary" onClick={loadStats} disabled={loading} style="width:auto;padding:12px 20px;">
-          {loading ? '…' : '🔍'}
-        </button>
-      </div>
-
-      {error && <p class="error-msg">{error}</p>}
 
       {stats && (
         <div class="profile-stats" style="flex-wrap:wrap;">
@@ -80,6 +92,26 @@ export function AdminStatsPage() {
           </div>
         </div>
       )}
+
+      <div style="margin-top:24px;padding:16px;background:#fff;border-radius:14px;border:1px solid #F0E0D0;">
+        <h3 style="margin-bottom:8px;">👑 Promuj użytkownika na admina</h3>
+        <form onSubmit={handlePromote} style="display:flex;gap:8px;">
+          <input
+            class="input"
+            type="text"
+            placeholder="Nazwa użytkownika"
+            value={promoteUser}
+            onInput={(e: any) => setPromoteUser(e.target.value)}
+            style="margin-bottom:0;flex:1;"
+            required
+          />
+          <button class="btn btn-primary" type="submit" disabled={promoting} style="width:auto;padding:12px 20px;">
+            {promoting ? '…' : 'Promuj'}
+          </button>
+        </form>
+        {promoteErr && <p class="error-msg" style="margin-top:8px;">{promoteErr}</p>}
+        {promoteMsg && <p class="success-msg" style="margin-top:8px;">{promoteMsg}</p>}
+      </div>
     </div>
   );
 }
