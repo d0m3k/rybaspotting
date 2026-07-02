@@ -12,7 +12,10 @@ type LeaderboardHandler struct {
 }
 
 func (h *LeaderboardHandler) Get(w http.ResponseWriter, r *http.Request) {
-	lb := models.Leaderboard{}
+	lb := models.Leaderboard{
+		TopSpotters:   make([]models.LeaderboardEntry, 0),
+		TopCollectors: make([]models.LeaderboardEntry, 0),
+	}
 
 	// Top spotters
 	rows, err := h.DB.Query(

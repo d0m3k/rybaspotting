@@ -13,6 +13,10 @@ export function LeaderboardPage() {
   }, []);
 
   if (loading) return <div class="page"><p class="loading-text">Ładowanie rankingu…</p></div>;
+  if (!data) return <div class="page"><p class="loading-text">Nie udało się załadować rankingu.</p></div>;
+
+  const spotters = data.top_spotters || [];
+  const collectors = data.top_collectors || [];
 
   function medal(i: number): string {
     if (i === 0) return '🥇';
@@ -32,14 +36,14 @@ export function LeaderboardPage() {
             <tr><th>#</th><th>Użytkownik</th><th>🐟</th></tr>
           </thead>
           <tbody>
-            {data?.top_spotters.map((e, i) => (
+            {spotters.map((e, i) => (
               <tr key={e.username}>
                 <td><span class="rank-medal">{medal(i)}</span> {i + 1}</td>
                 <td><strong>{e.username}</strong></td>
                 <td>{e.count}</td>
               </tr>
             ))}
-            {data?.top_spotters.length === 0 && (
+            {spotters.length === 0 && (
               <tr><td colSpan={3} style="text-align:center;color:#999;padding:16px;">Brak danych</td></tr>
             )}
           </tbody>
@@ -53,14 +57,14 @@ export function LeaderboardPage() {
             <tr><th>#</th><th>Użytkownik</th><th>🎒</th></tr>
           </thead>
           <tbody>
-            {data?.top_collectors.map((e, i) => (
+            {collectors.map((e, i) => (
               <tr key={e.username}>
                 <td><span class="rank-medal">{medal(i)}</span> {i + 1}</td>
                 <td><strong>{e.username}</strong></td>
                 <td>{e.count}</td>
               </tr>
             ))}
-            {data?.top_collectors.length === 0 && (
+            {collectors.length === 0 && (
               <tr><td colSpan={3} style="text-align:center;color:#999;padding:16px;">Brak danych</td></tr>
             )}
           </tbody>
