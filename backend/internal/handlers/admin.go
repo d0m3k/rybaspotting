@@ -3,6 +3,7 @@ package handlers
 import (
 	"database/sql"
 	"net/http"
+	"os"
 
 	"rybaspotting/internal/config"
 )
@@ -12,11 +13,16 @@ type AdminHandler struct {
 	Cfg *config.Config
 }
 
+type adminStatsResponse struct {
+	UserCount    int   `json:"user_count"`
+	FishCount    int   `json:"fish_count"`
+	PhotoCount   int   `json:"photo_count"`
+	PhotoSizeMB  int64 `json:"photo_size_mb"`
+}
+
 // ApproveUser sets is_active = true for a given username, guarded by X-Admin-Token.
 func (h *AdminHandler) ApproveUser(w http.ResponseWriter, r *http.Request) {
-	token := r.Header.Get("X-Admin-Token")
-	if token == "" || token != h.Cfg.AdminToken {
-		http.Error(w, `{"error":"invalid admin token"}`, http.StatusForbidden)
+	if !checkAdminToken(w, r, h.Cfg) {
 		return
 	}
 
@@ -42,9 +48,7 @@ func (h *AdminHandler) ApproveUser(w http.ResponseWriter, r *http.Request) {
 
 // ToggleGalleryUpload flips the runtime allowGalleryUpload flag.
 func (h *AdminHandler) ToggleGalleryUpload(w http.ResponseWriter, r *http.Request) {
-	token := r.Header.Get("X-Admin-Token")
-	if token == "" || token != h.Cfg.AdminToken {
-		http.Error(w, `{"error":"invalid admin token"}`, http.StatusForbidden)
+	if !checkAdminToken(w, r, h.Cfg) {
 		return
 	}
 
@@ -52,4 +56,33 @@ func (h *AdminHandler) ToggleGalleryUpload(w http.ResponseWriter, r *http.Reques
 	h.Cfg.SetAllowGalleryUpload(!current)
 
 	writeJSON(w, http.StatusOK, map[string]bool{"allow_gallery_upload": h.Cfg.AllowGalleryUpload()})
+}
+
+// Stats returns admin dashboard stats: user count, fish count, photo count.
+func (h *AdminHandler) Stats(w http.ResponseWriter, r *http.Request) {
+	if !checkAdminToken(w, r, h.Cfg) {
+		return
+	}
+
+	var resp adminStatsResponse
+
+	h.DB.QueryRow(`SELECT COUNT(*) FROM users`).Scan(&resp.UserCount)
+	h.DB.QueryRow(`SELECT COUNT(*) FROM fish`).Scan(&resp.FishCount)
+
+	// Count photo files in the photo directory
+	if ents, err := os.ReadDir(h.Cfg.PhotoDir); err == nil {
+		for _, e := range ents {
+			if e.IsDir() {
+				continue
+			}
+			resp.PhotoCount++
+			if info, err := e.Info(); err == nil {
+				resp.PhotoSizeMB += info.Size()
+			}
+		}
+	}
+	// Convert bytes to MB
+	resp.PhotoSizeMB = resp.PhotoSizeMB / (1024 * 1024)
+
+	writeJSON(w, http.StatusOK, resp)
 }

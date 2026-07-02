@@ -1,14 +1,15 @@
 import { h } from 'preact';
 
-type Page = 'login' | 'register' | 'map' | 'spot' | 'upload' | 'leaderboard' | 'profile';
+type Page = 'login' | 'register' | 'map' | 'spot' | 'upload' | 'leaderboard' | 'profile' | 'admin';
 
 interface NavBarProps {
   current: Page;
   onNavigate: (p: Page) => void;
   allowUpload: boolean;
+  isAdmin: boolean;
 }
 
-export function NavBar({ current, onNavigate, allowUpload }: NavBarProps) {
+export function NavBar({ current, onNavigate, allowUpload, isAdmin }: NavBarProps) {
   const tabs: { page: Page; label: string; icon: string }[] = [
     { page: 'map', label: 'Mapa', icon: '🗺️' },
     { page: 'spot', label: 'Spot', icon: '📸' },
@@ -20,6 +21,9 @@ export function NavBar({ current, onNavigate, allowUpload }: NavBarProps) {
     { page: 'leaderboard', label: 'Ranking', icon: '🏆' },
     { page: 'profile', label: 'Profil', icon: '👤' },
   );
+  if (isAdmin) {
+    tabs.push({ page: 'admin', label: 'Admin', icon: '🔑' });
+  }
 
   return (
     <nav class="nav-bar">

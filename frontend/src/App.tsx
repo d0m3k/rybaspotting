@@ -7,9 +7,10 @@ import { SpotPage } from './pages/Spot';
 import { UploadPage } from './pages/Upload';
 import { LeaderboardPage } from './pages/Leaderboard';
 import { ProfilePage } from './pages/Profile';
+import { AdminStatsPage } from './pages/AdminStats';
 import { NavBar } from './components/NavBar';
 
-type Page = 'login' | 'register' | 'map' | 'spot' | 'upload' | 'leaderboard' | 'profile';
+type Page = 'login' | 'register' | 'map' | 'spot' | 'upload' | 'leaderboard' | 'profile' | 'admin';
 
 export function App() {
   const [auth, setAuth] = useState<AuthState | null>(loadAuth);
@@ -59,8 +60,9 @@ export function App() {
         {page === 'upload' && allowUpload && <UploadPage />}
         {page === 'leaderboard' && <LeaderboardPage />}
         {page === 'profile' && <ProfilePage auth={auth} onLogout={handleLogout} />}
+        {page === 'admin' && <AdminStatsPage />}
       </div>
-      <NavBar current={page} onNavigate={navigate} allowUpload={allowUpload} />
+      <NavBar current={page} onNavigate={navigate} allowUpload={allowUpload} isAdmin={auth?.isAdmin ?? false} />
     </div>
   );
 }

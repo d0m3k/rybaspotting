@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"net/http"
+	"strings"
 
 	"rybaspotting/internal/config"
 	"rybaspotting/internal/middleware"
@@ -20,6 +21,7 @@ type registerRequest struct {
 	Username    string `json:"username"`
 	Password    string `json:"password"`
 	DisplayName string `json:"display_name"`
+	Captcha     string `json:"captcha"`
 }
 
 type loginRequest struct {
@@ -47,6 +49,12 @@ func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Simple captcha — "Ryby z czym?" → "dupom"
+	if strings.ToLower(strings.TrimSpace(req.Captcha)) != "dupom" {
+		http.Error(w, `{"error":"wrong answer to the ryba question"}`, http.StatusBadRequest)
+		return
+	}
+
 	hash, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
 	if err != nil {
 		http.Error(w, `{"error":"internal error"}`, http.StatusInternalServerError)
@@ -55,7 +63,7 @@ func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 
 	var userID int
 	err = h.DB.QueryRow(
-		`INSERT INTO users (username, password_hash, display_name, is_active) VALUES ($1, $2, $3, false) RETURNING id`,
+		`INSERT INTO users (username, password_hash, display_name, is_active) VALUES ($1, $2, $3, true) RETURNING id`,
 		req.Username, string(hash), req.DisplayName,
 	).Scan(&userID)
 	if err != nil {
@@ -69,7 +77,7 @@ func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 	}
 
 	writeJSON(w, http.StatusCreated, map[string]string{
-		"message": "registration successful, awaiting admin approval",
+		"message": "registration successful",
 	})
 }
 

@@ -11,6 +11,7 @@ export function RegisterPage({ onLogin }: Props) {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [displayName, setDisplayName] = useState('');
+  const [captcha, setCaptcha] = useState('');
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -21,8 +22,8 @@ export function RegisterPage({ onLogin }: Props) {
     setMessage('');
     setLoading(true);
     try {
-      const res: any = await api.register(username, password, displayName);
-      setMessage(res.message || 'Rejestracja udana!');
+      const res: any = await api.register(username, password, displayName, captcha);
+      setMessage(res.message || 'Rejestracja udana! Możesz się teraz zalogować.');
     } catch (err: any) {
       setError(err.message);
     } finally {
@@ -60,6 +61,18 @@ export function RegisterPage({ onLogin }: Props) {
             placeholder="Wyświetlana nazwa (opcjonalnie)"
             value={displayName}
             onInput={(e: any) => setDisplayName(e.target.value)}
+          />
+          <p style="font-size:13px;color:#7F8C8D;margin-bottom:8px;text-align:center;">
+            🐟 Pytanie-ryba: <strong>„Ryby z czym?"</strong> (jedno słowo)
+          </p>
+          <input
+            class="input"
+            type="text"
+            placeholder="Twoja odpowiedź…"
+            value={captcha}
+            onInput={(e: any) => setCaptcha(e.target.value)}
+            required
+            autocomplete="off"
           />
           {error && <p class="error-msg">{error}</p>}
           {message && <p class="success-msg">{message}</p>}
