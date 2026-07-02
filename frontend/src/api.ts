@@ -74,6 +74,18 @@ export const api = {
   uncollect: (fishId: number) =>
     request(`/api/fish/${fishId}/collect`, { method: 'DELETE' }),
 
+  // User stats
+  getMyStats: () =>
+    request<{
+      user_id: number;
+      username: string;
+      display_name: string;
+      is_active: boolean;
+      is_admin: boolean;
+      spotted: number;
+      collected: number;
+    }>('/api/users/me'),
+
   // Leaderboard
   leaderboard: () =>
     request<{ top_spotters: { username: string; count: number }[]; top_collectors: { username: string; count: number }[] }>(

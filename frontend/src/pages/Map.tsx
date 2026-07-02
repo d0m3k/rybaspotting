@@ -81,7 +81,7 @@ export function MapPage() {
         <div class="bottom-sheet">
           <button class="close-btn" onClick={() => setSelectedFish(null)}>✕</button>
           <img
-            src={`/photos/${selectedFish.photo_filename}`}
+            src={`/api/photos/${selectedFish.photo_filename}`}
             alt="Ryba"
             class="fish-preview"
           />

@@ -4,6 +4,7 @@
 # Build output
 dist/
 frontend/dist/
+backend/rybaspotting
 
 # Go
 .gopath/

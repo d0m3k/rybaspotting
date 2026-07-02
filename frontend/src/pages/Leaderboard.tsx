@@ -12,49 +12,60 @@ export function LeaderboardPage() {
       .finally(() => setLoading(false));
   }, []);
 
-  if (loading) return <div class="page"><p>Ładowanie...</p></div>;
+  if (loading) return <div class="page"><p class="loading-text">Ładowanie rankingu…</p></div>;
+
+  function medal(i: number): string {
+    if (i === 0) return '🥇';
+    if (i === 1) return '🥈';
+    if (i === 2) return '🥉';
+    return '';
+  }
 
   return (
     <div class="page">
       <h2>🏆 Ranking</h2>
 
-      <h3>Top Spotters (kto znalazł najwięcej ryb)</h3>
-      <table class="leaderboard-table">
-        <thead>
-          <tr><th>#</th><th>Użytkownik</th><th>Ryby</th></tr>
-        </thead>
-        <tbody>
-          {data?.top_spotters.map((e, i) => (
-            <tr key={e.username}>
-              <td>{i + 1}</td>
-              <td>{e.username}</td>
-              <td>{e.count}</td>
-            </tr>
-          ))}
-          {data?.top_spotters.length === 0 && (
-            <tr><td colSpan={3}>Brak danych</td></tr>
-          )}
-        </tbody>
-      </table>
+      <div class="leaderboard-section">
+        <h3>📸 Top Spotters — kto znalazł najwięcej ryb</h3>
+        <table class="leaderboard-table">
+          <thead>
+            <tr><th>#</th><th>Użytkownik</th><th>🐟</th></tr>
+          </thead>
+          <tbody>
+            {data?.top_spotters.map((e, i) => (
+              <tr key={e.username}>
+                <td><span class="rank-medal">{medal(i)}</span> {i + 1}</td>
+                <td><strong>{e.username}</strong></td>
+                <td>{e.count}</td>
+              </tr>
+            ))}
+            {data?.top_spotters.length === 0 && (
+              <tr><td colSpan={3} style="text-align:center;color:#999;padding:16px;">Brak danych</td></tr>
+            )}
+          </tbody>
+        </table>
+      </div>
 
-      <h3>Top Collectors (kto zebrał najwięcej)</h3>
-      <table class="leaderboard-table">
-        <thead>
-          <tr><th>#</th><th>Użytkownik</th><th>Kolekcje</th></tr>
-        </thead>
-        <tbody>
-          {data?.top_collectors.map((e, i) => (
-            <tr key={e.username}>
-              <td>{i + 1}</td>
-              <td>{e.username}</td>
-              <td>{e.count}</td>
-            </tr>
-          ))}
-          {data?.top_collectors.length === 0 && (
-            <tr><td colSpan={3}>Brak danych</td></tr>
-          )}
-        </tbody>
-      </table>
+      <div class="leaderboard-section">
+        <h3>🎣 Top Collectors — kto zebrał najwięcej</h3>
+        <table class="leaderboard-table">
+          <thead>
+            <tr><th>#</th><th>Użytkownik</th><th>🎒</th></tr>
+          </thead>
+          <tbody>
+            {data?.top_collectors.map((e, i) => (
+              <tr key={e.username}>
+                <td><span class="rank-medal">{medal(i)}</span> {i + 1}</td>
+                <td><strong>{e.username}</strong></td>
+                <td>{e.count}</td>
+              </tr>
+            ))}
+            {data?.top_collectors.length === 0 && (
+              <tr><td colSpan={3} style="text-align:center;color:#999;padding:16px;">Brak danych</td></tr>
+            )}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }

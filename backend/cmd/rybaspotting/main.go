@@ -40,6 +40,7 @@ func main() {
 	fishH := &handlers.FishHandler{DB: conn, Cfg: cfg}
 	collectH := &handlers.CollectHandler{DB: conn}
 	leaderboardH := &handlers.LeaderboardHandler{DB: conn}
+	userH := &handlers.UserHandler{DB: conn}
 
 	// Build router
 	r := chi.NewRouter()
@@ -78,6 +79,9 @@ func main() {
 			r.Post("/fish", fishH.Create)
 			r.Post("/fish/{id}/collect", collectH.Collect)
 			r.Delete("/fish/{id}/collect", collectH.Uncollect)
+
+			// User stats
+			r.Get("/users/me", userH.Me)
 		})
 
 		// Admin endpoints (protected by X-Admin-Token)

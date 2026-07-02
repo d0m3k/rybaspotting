@@ -1,5 +1,6 @@
 import { useState } from 'preact/hooks';
 import { api } from '../api';
+import { Ryboczek } from '../components/Ryboczek';
 import { AuthState } from '../stores/auth';
 
 interface Props {
@@ -37,7 +38,10 @@ export function LoginPage({ onLogin, onRegister }: Props) {
   return (
     <div class="auth-page">
       <div class="auth-card">
-        <h1 class="auth-title">🐟 Ryby z Dupom</h1>
+        <div class="auth-mascot">
+          <Ryboczek size={100} />
+        </div>
+        <h1 class="auth-title">Ryby z Dupom</h1>
         <p class="auth-subtitle">Spotter — Kraków</p>
         <form onSubmit={handleSubmit}>
           <input
@@ -63,9 +67,9 @@ export function LoginPage({ onLogin, onRegister }: Props) {
         </form>
         <p class="auth-link">
           Nie masz konta?{' '}
-          <a href="#" onClick={(e) => { e.preventDefault(); onRegister(); }}>
+          <span onClick={(e) => { e.preventDefault(); onRegister(); }}>
             Zarejestruj się
-          </a>
+          </span>
         </p>
       </div>
     </div>
