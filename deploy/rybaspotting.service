@@ -1,0 +1,22 @@
+[Unit]
+Description=Ryby z Dupom — Spotter backend
+After=network.target postgresql.service
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/opt/rybaspotting
+EnvironmentFile=/opt/rybaspotting/.env
+ExecStart=/opt/rybaspotting/rybaspotting
+Restart=always
+RestartSec=5
+LimitNOFILE=65536
+
+# Security
+NoNewPrivileges=true
+ProtectSystem=full
+ProtectHome=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

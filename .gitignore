@@ -1,0 +1,22 @@
+# Environment
+.env
+
+# Build output
+dist/
+frontend/dist/
+
+# Go
+.gopath/
+.gomodcache/
+go/
+
+# Node
+node_modules/
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db

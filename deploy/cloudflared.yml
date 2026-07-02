@@ -1,0 +1,18 @@
+# cloudflared configuration for ryby.dom3k.pl
+# Install cloudflared, then run:
+#   cloudflared tunnel login
+#   cloudflared tunnel create rybaspotting
+# This will create a tunnel ID and credentials file.
+# Then update the tunnel ID below and run:
+#   cloudflared tunnel route dns <tunnel-id> ryby.dom3k.pl
+#   sudo cloudflared --config /etc/cloudflared/config.yml tunnel run
+
+tunnel: YOUR-TUNNEL-ID
+credentials-file: /root/.cloudflared/YOUR-TUNNEL-ID.json
+
+ingress:
+  # Route all traffic to local nginx (port 80)
+  - hostname: ryby.dom3k.pl
+    service: http://localhost:80
+  # Catch-all: return 404 for unknown hostnames
+  - service: http_status:404
