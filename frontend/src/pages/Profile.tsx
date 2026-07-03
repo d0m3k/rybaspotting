@@ -80,30 +80,33 @@ export function ProfilePage({ auth, onLogout }: Props) {
         </p>
       ) : (
         <div class="my-fish-list">
-          {myFish.map(f => (
-            <div key={f.id} class="my-fish-item" onClick={() => setExpandedFish(expandedFish?.id === f.id ? null : f)} style="cursor:pointer;">
-              <img src={`/api/photos/${f.photo_filename}`} alt="ryba" class="mini-thumb" />
-              <div>
-                <p style="font-weight:500;font-size:14px;">📍 {f.latitude.toFixed(4)}, {f.longitude.toFixed(4)}</p>
-                {f.address_hint && <p style="font-size:12px;color:#999;">{f.address_hint}</p>}
-                <p class="date">{new Date(f.created_at).toLocaleDateString('pl-PL')}</p>
+          {myFish.map(f => {
+            const isExpanded = expandedFish?.id === f.id;
+            return (
+              <div key={f.id} style={{ display: 'contents' }}>
+                <div class="my-fish-item" onClick={() => setExpandedFish(isExpanded ? null : f)} style="cursor:pointer;">
+                  <img src={`/api/photos/${f.photo_filename}`} alt="ryba" class="mini-thumb" />
+                  <div>
+                    <p style="font-weight:500;font-size:14px;">📍 {f.latitude.toFixed(4)}, {f.longitude.toFixed(4)}</p>
+                    {f.address_hint && <p style="font-size:12px;color:#999;">{f.address_hint}</p>}
+                    <p class="date">{new Date(f.created_at).toLocaleDateString('pl-PL')}</p>
+                  </div>
+                </div>
+                {isExpanded && (
+                  <div style="background:#fff;border-radius:14px;padding:12px;box-shadow:0 2px 12px rgba(0,0,0,0.08);margin-bottom:8px;">
+                    <img
+                      src={`/api/photos/${f.photo_filename}`}
+                      alt="ryba"
+                      style="width:100%;max-height:300px;object-fit:cover;border-radius:10px;margin-bottom:8px;"
+                    />
+                    <p style="font-weight:600;font-size:15px;">📍 {f.latitude.toFixed(5)}, {f.longitude.toFixed(5)}</p>
+                    {f.address_hint && <p style="font-size:13px;color:#7F8C8D;margin-top:4px;">{f.address_hint}</p>}
+                    <p style="font-size:12px;color:#999;margin-top:4px;">{new Date(f.created_at).toLocaleDateString('pl-PL')}</p>
+                  </div>
+                )}
               </div>
-            </div>
-          ))}
-        </div>
-      )}
-
-      {/* Expanded fish detail */}
-      {expandedFish && (
-        <div style="background:#fff;border-radius:14px;padding:12px;margin-top:12px;box-shadow:0 2px 12px rgba(0,0,0,0.08);">
-          <img
-            src={`/api/photos/${expandedFish.photo_filename}`}
-            alt="ryba"
-            style="width:100%;max-height:300px;object-fit:cover;border-radius:10px;margin-bottom:8px;"
-          />
-          <p style="font-weight:600;font-size:15px;">📍 {expandedFish.latitude.toFixed(5)}, {expandedFish.longitude.toFixed(5)}</p>
-          {expandedFish.address_hint && <p style="font-size:13px;color:#7F8C8D;margin-top:4px;">{expandedFish.address_hint}</p>}
-          <p style="font-size:12px;color:#999;margin-top:4px;">{new Date(expandedFish.created_at).toLocaleDateString('pl-PL')}</p>
+            );
+          })}
         </div>
       )}
 
