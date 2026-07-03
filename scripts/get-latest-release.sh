@@ -1,75 +1,49 @@
 #!/bin/bash
-# Download the latest GitHub Actions release artifact.
+# Download the latest release from GitHub (no token needed!)
 #
-# Usage:
-#   1. Create a GitHub token: https://github.com/settings/tokens
-#      (needs only "actions:read" scope — no repo access needed)
-#   2. Export it or pass it as an argument:
+# Usage on your server:
+#   wget -qO- https://raw.githubusercontent.com/d0m3k/rybaspotting/master/scripts/get-latest-release.sh | bash
 #
-#   export GITHUB_TOKEN=ghp_xxxxx
-#   ./scripts/get-latest-release.sh
-#
-#   Or pass inline:
-#   GITHUB_TOKEN=ghp_xxxxx ./scripts/get-latest-release.sh
+# Or:
+#   curl -sL https://raw.githubusercontent.com/d0m3k/rybaspotting/master/scripts/get-latest-release.sh | bash
 
 set -euo pipefail
 
-TOKEN="${GITHUB_TOKEN:-}"
 REPO="d0m3k/rybaspotting"
+OUTDIR="${1:-/opt/rybaspotting}"
 
-if [ -z "$TOKEN" ]; then
-  echo "Error: GITHUB_TOKEN not set"
-  echo ""
-  echo "Create one at: https://github.com/settings/tokens"
-  echo "Only 'actions:read' scope is needed."
-  echo ""
-  echo "Then:  export GITHUB_TOKEN=ghp_xxxxx"
-  echo "       $0"
+echo "=== Fetching latest release ==="
+LATEST=$(curl -s "https://api.github.com/repos/${REPO}/releases/latest" 2>/dev/null)
+TAG=$(echo "$LATEST" | python3 -c "import sys,json; print(json.load(sys.stdin)['tag_name'])" 2>/dev/null)
+
+if [ -z "$TAG" ]; then
+  echo "Error: Could not find latest release"
+  echo "Check: https://github.com/${REPO}/releases"
   exit 1
 fi
 
-echo "=== Fetching latest successful run ==="
-RUN_URL="https://api.github.com/repos/${REPO}/actions/runs?per_page=1&status=success&event=push&branch=master"
-RUN_JSON=$(curl -s -H "Authorization: Bearer ${TOKEN}" "$RUN_URL")
-RUN_ID=$(echo "$RUN_JSON" | python3 -c "import sys,json; print(json.load(sys.stdin)['workflow_runs'][0]['id'])" 2>/dev/null)
+echo "  Latest: ${TAG}"
+echo ""
 
-if [ -z "$RUN_ID" ]; then
-  echo "Error: Could not find latest run"
-  exit 1
-fi
-echo "  Latest run: #${RUN_ID}"
-
-echo "=== Fetching artifact ==="
-ART_URL="https://api.github.com/repos/${REPO}/actions/runs/${RUN_ID}/artifacts"
-ART_JSON=$(curl -s -H "Authorization: Bearer ${TOKEN}" "$ART_URL")
-ART_ID=$(echo "$ART_JSON" | python3 -c "import sys,json; print(json.load(sys.stdin)['artifacts'][0]['id'])" 2>/dev/null)
-ART_NAME=$(echo "$ART_JSON" | python3 -c "import sys,json; print(json.load(sys.stdin)['artifacts'][0]['name'])" 2>/dev/null)
-
-if [ -z "$ART_ID" ]; then
-  echo "Error: Could not find artifact"
-  exit 1
-fi
-echo "  Artifact: ${ART_NAME} (id=${ART_ID})"
-
+DOWNLOAD="https://github.com/${REPO}/releases/download/${TAG}/rybaspotting-release.tar.gz"
 echo "=== Downloading ==="
-DL_URL="https://api.github.com/repos/${REPO}/actions/artifacts/${ART_ID}/zip"
-curl -L -s -o /tmp/rybaspotting-release.zip \
-  -H "Authorization: Bearer ${TOKEN}" \
-  "$DL_URL"
-
-echo "  Downloaded: /tmp/rybaspotting-release.zip"
-echo "  Size: $(ls -lh /tmp/rybaspotting-release.zip | awk '{print $5}')"
+wget -q --show-progress -O /tmp/rybaspotting-release.tar.gz "$DOWNLOAD"
+echo "  Size: $(ls -lh /tmp/rybaspotting-release.tar.gz | awk '{print $5}')"
+echo ""
 
 echo "=== Extracting ==="
 mkdir -p /tmp/rybaspotting-release
-cd /tmp/rybaspotting-release
-unzip -q -o /tmp/rybaspotting-release.zip
+tar -xzf /tmp/rybaspotting-release.tar.gz -C /tmp/rybaspotting-release
 echo "  Extracted to: /tmp/rybaspotting-release"
-
 echo ""
-echo "=== To deploy, run: ==="
-echo "  systemctl stop rybaspotting"
-echo "  cp /tmp/rybaspotting-release/rybaspotting /opt/rybaspotting/"
-echo "  rm -rf /opt/rybaspotting/frontend"
-echo "  cp -r /tmp/rybaspotting-release/frontend /opt/rybaspotting/"
-echo "  systemctl start rybaspotting"
+
+echo "=== Deploying to ${OUTDIR} ==="
+systemctl stop rybaspotting 2>/dev/null || true
+cp /tmp/rybaspotting-release/rybaspotting "${OUTDIR}/"
+rm -rf "${OUTDIR}/frontend"
+cp -r /tmp/rybaspotting-release/frontend "${OUTDIR}/"
+systemctl start rybaspotting
+echo ""
+
+echo "=== Done! ==="
+systemctl status rybaspotting --no-pager | head -3
