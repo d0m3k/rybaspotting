@@ -1,11 +1,11 @@
 import { useState, useRef } from 'preact/hooks';
 import { api } from '../api';
 
-type Step = 'start' | 'photo' | 'confirm' | 'done';
+type Step = 'start' | 'confirm' | 'done';
 
 export function SpotPage() {
   const [step, setStep] = useState<Step>('start');
-  const [photoBlob, setPhotoBlob] = useState<Blob | null>(null);
+  const [photoFile, setPhotoFile] = useState<File | null>(null);
   const [photoUrl, setPhotoUrl] = useState<string>('');
   const [lat, setLat] = useState<number>(0);
   const [lng, setLng] = useState<number>(0);
@@ -17,27 +17,9 @@ export function SpotPage() {
   const [loading, setLoading] = useState(false);
   const [addressHint, setAddressHint] = useState('');
   const [message, setMessage] = useState('');
-  const videoRef = useRef<HTMLVideoElement>(null);
-  const canvasRef = useRef<HTMLCanvasElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // ── Geolocation ──────────────────────────────────────────────────────
-  async function getLocation(): Promise<{ lat: number; lng: number } | null> {
-    try {
-      const pos = await new Promise<GeolocationPosition>((resolve, reject) => {
-        navigator.geolocation.getCurrentPosition(resolve, reject, {
-          enableHighAccuracy: false,         // fast, not GPS-only
-          timeout: 8000,
-          maximumAge: 60000,                 // reuse a cached position
-        });
-      });
-      return { lat: pos.coords.latitude, lng: pos.coords.longitude };
-    } catch {
-      return null;
-    }
-  }
-
-  // ── Main flow ────────────────────────────────────────────────────────
+  // ── Geolocation + trigger native camera ─────────────────────────────
   async function startCapture() {
     setLoading(true);
     setGpsStatus('loading');
@@ -53,92 +35,55 @@ export function SpotPage() {
     } else {
       setGpsStatus('failed');
       setUseManualCoords(true);
-      // No alert — user can type coords manually later
-    }
-
-    // 2. Try camera → fallback to file picker
-    try {
-      const stream = await navigator.mediaDevices?.getUserMedia({
-        video: { facingMode: { ideal: 'environment' } },
-      });
-      if (stream) {
-        // Set step first so Preact renders the <video> element,
-        // then attach the stream on the next frame.
-        setStep('photo');
-        await new Promise(r => requestAnimationFrame(r));
-        if (videoRef.current) {
-          videoRef.current.srcObject = stream;
-          videoRef.current.muted = true;
-          await videoRef.current.play();
-        }
-      }
-    } catch {
-      // Camera not available → open file picker directly
-      fileInputRef.current?.click();
     }
 
     setLoading(false);
+
+    // 2. Open native camera / file picker
+    //    capture="environment" → native camera on mobile, file picker on desktop
+    fileInputRef.current?.click();
   }
 
-  // ── Photo capture ─────────────────────────────────────────────────────
-  function capturePhoto() {
-    const video = videoRef.current;
-    const canvas = canvasRef.current;
-    if (!video || !canvas) return;
-
-    canvas.width = video.videoWidth;
-    canvas.height = video.videoHeight;
-    const ctx = canvas.getContext('2d');
-    ctx?.drawImage(video, 0, 0);
-
-    canvas.toBlob(async (blob) => {
-      if (!blob) return;
-      setPhotoBlob(blob);
-      setPhotoUrl(canvas.toDataURL('image/jpeg'));
-
-      // Stop camera
-      const stream = video.srcObject as MediaStream;
-      stream?.getTracks().forEach(t => t.stop());
-
-      // Check nearby fish
-      await checkNearby();
-      setStep('confirm');
-    }, 'image/jpeg', 0.9);
+  async function getLocation(): Promise<{ lat: number; lng: number } | null> {
+    try {
+      const pos = await new Promise<GeolocationPosition>((resolve, reject) => {
+        navigator.geolocation.getCurrentPosition(resolve, reject, {
+          enableHighAccuracy: false,
+          timeout: 8000,
+          maximumAge: 60000,
+        });
+      });
+      return { lat: pos.coords.latitude, lng: pos.coords.longitude };
+    } catch {
+      return null;
+    }
   }
 
-  // ── File fallback ─────────────────────────────────────────────────────
+  // ── File picked (from camera or gallery) ────────────────────────────
   async function handleFileInput(e: Event) {
     const input = e.target as HTMLInputElement;
     const file = input.files?.[0];
-    if (!file) {
-      // User cancelled — go back to start
-      setStep('start');
-      return;
-    }
+    if (!file) return; // user cancelled — stay on start
 
-    setPhotoBlob(file);
+    setPhotoFile(file);
     setPhotoUrl(URL.createObjectURL(file));
 
-    // Check nearby
-    await checkNearby();
+    // Check nearby fish
+    const checkLat = useManualCoords ? parseFloat(manualLat) : lat;
+    const checkLng = useManualCoords ? parseFloat(manualLng) : lng;
+    if (checkLat && checkLng) {
+      try {
+        const nearby = await api.nearbyFish(checkLat, checkLng);
+        setNearbyFish(nearby);
+      } catch {
+        setNearbyFish([]);
+      }
+    }
+
     setStep('confirm');
   }
 
-  // ── Nearby check ──────────────────────────────────────────────────────
-  async function checkNearby() {
-    const checkLat = useManualCoords ? parseFloat(manualLat) : lat;
-    const checkLng = useManualCoords ? parseFloat(manualLng) : lng;
-    if (!checkLat || !checkLng) return;
-
-    try {
-      const nearby = await api.nearbyFish(checkLat, checkLng);
-      setNearbyFish(nearby);
-    } catch {
-      setNearbyFish([]);
-    }
-  }
-
-  // ── Submit / Collect ──────────────────────────────────────────────────
+  // ── Submit / Collect ────────────────────────────────────────────────
   async function handleCollectExisting(fishId: number) {
     try {
       await api.collect(fishId);
@@ -157,7 +102,7 @@ export function SpotPage() {
       alert('Podaj lokalizację (GPS lub ręcznie)');
       return;
     }
-    if (!photoBlob) {
+    if (!photoFile) {
       alert('Najpierw zrób zdjęcie');
       return;
     }
@@ -165,7 +110,7 @@ export function SpotPage() {
     setLoading(true);
     try {
       const formData = new FormData();
-      formData.append('photo', photoBlob, 'capture.jpg');
+      formData.append('photo', photoFile, 'capture.jpg');
       formData.append('latitude', String(finalLat));
       formData.append('longitude', String(finalLng));
       formData.append('address_hint', addressHint);
@@ -182,7 +127,7 @@ export function SpotPage() {
 
   function reset() {
     setStep('start');
-    setPhotoBlob(null);
+    setPhotoFile(null);
     setPhotoUrl('');
     setLat(0);
     setLng(0);
@@ -193,9 +138,11 @@ export function SpotPage() {
     setNearbyFish([]);
     setAddressHint('');
     setMessage('');
+    // Reset file input so picking the same file re-fires onChange
+    if (fileInputRef.current) fileInputRef.current.value = '';
   }
 
-  // ── Render ────────────────────────────────────────────────────────────
+  // ── Render ──────────────────────────────────────────────────────────
   if (step === 'done') {
     return (
       <div class="page">
@@ -214,6 +161,9 @@ export function SpotPage() {
       {step === 'start' && (
         <div class="spot-start">
           <p>Zrób zdjęcie rybie w miejscu, gdzie ją znalazłeś.</p>
+          <p style="font-size:13px;color:#7F8C8D;text-align:center;">
+            Otworzy się aparat — zrobisz zdjęcie i wrócisz do apki.
+          </p>
 
           {gpsStatus === 'failed' && (
             <p style={{ color: '#7F8C8D', fontSize: '13px', textAlign: 'center' }}>
@@ -222,10 +172,10 @@ export function SpotPage() {
           )}
 
           <button class="btn btn-primary" onClick={startCapture} disabled={loading}>
-            {loading ? 'Przygotowywanie...' : 'Zrób zdjęcie!'}
+            {loading ? 'Pobieranie lokalizacji…' : 'Zrób zdjęcie! 📷'}
           </button>
 
-          {/* Hidden file input as fallback for desktop without camera */}
+          {/* Native camera on mobile, file picker on desktop */}
           <input
             ref={fileInputRef}
             type="file"
@@ -234,16 +184,6 @@ export function SpotPage() {
             style={{ display: 'none' }}
             onChange={handleFileInput}
           />
-        </div>
-      )}
-
-      {step === 'photo' && (
-        <div class="camera-view">
-          <video ref={videoRef} autoplay muted playsinline class="camera-video" />
-          <canvas ref={canvasRef} style={{ display: 'none' }} />
-          <button class="btn btn-primary capture-btn" onClick={capturePhoto}>
-            Zrób zdjęcie!
-          </button>
         </div>
       )}
 
