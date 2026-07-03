@@ -2,7 +2,7 @@ import { useState, useRef } from 'preact/hooks';
 import { api } from '../api';
 import { LocationPicker } from '../components/LocationPicker';
 
-type Step = 'start' | 'photo' | 'confirm' | 'done';
+type Step = 'start' | 'confirm' | 'done';
 
 export function SpotPage() {
   const [step, setStep] = useState<Step>('start');
@@ -19,8 +19,6 @@ export function SpotPage() {
   const [addressHint, setAddressHint] = useState('');
   const [message, setMessage] = useState('');
   const [showMapPicker, setShowMapPicker] = useState(false);
-  const videoRef = useRef<HTMLVideoElement>(null);
-  const canvasRef = useRef<HTMLCanvasElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // ── Geolocation ───────────────────────────────────────────────────
@@ -39,12 +37,11 @@ export function SpotPage() {
     }
   }
 
-  // ── Main flow ────────────────────────────────────────────────────
+  // ── Start: get location, then open gallery ───────────────────────
   async function startCapture() {
     setLoading(true);
     setGpsStatus('loading');
 
-    // 1. Geolocation (non-blocking)
     const loc = await getLocation();
     if (loc) {
       setLat(loc.lat);
@@ -57,83 +54,33 @@ export function SpotPage() {
       setUseManualCoords(true);
     }
 
-    // 2. Try in-browser camera stream first (no backgrounding = no Android OOM)
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: 'environment', width: { ideal: 1280 } },
-      });
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-        await videoRef.current.play();
-        setStep('photo');
-        setLoading(false);
-        return;
-      }
-    } catch {
-      // Camera denied / no camera → fall back to file picker below
-    }
-
-    // 3. Fallback: file picker (desktop or user denied camera)
     setLoading(false);
+    // Open file picker — on mobile this is the gallery (in-app overlay, no backgrounding).
+    // User should take the photo with their camera app before coming here.
     fileInputRef.current?.click();
   }
 
-  // ── Capture frame from video ─────────────────────────────────────
-  // Uses toDataURL instead of toBlob because toBlob can fail silently on mobile Chrome.
-  function capturePhoto() {
-    const video = videoRef.current;
-    const canvas = canvasRef.current;
-    if (!video || !canvas) {
-      console.warn('capturePhoto: video or canvas ref missing');
-      return;
-    }
+  // ── File selected ────────────────────────────────────────────────
+  async function handleFileInput(e: Event) {
+    const input = e.target as HTMLInputElement;
+    const file = input.files?.[0];
+    if (!file) return;
 
-    canvas.width = video.videoWidth;
-    canvas.height = video.videoHeight;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-    ctx.drawImage(video, 0, 0);
-
-    // dataURL → Blob (synchronous, no silent failure)
-    const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
-    const blob = dataURLtoBlob(dataUrl);
-
-    setPhotoBlob(blob);
-    setPhotoUrl(dataUrl);
-
-    // Stop camera stream
-    const stream = video.srcObject as MediaStream;
-    stream?.getTracks().forEach((t) => t.stop());
+    setPhotoBlob(file);
+    setPhotoUrl(URL.createObjectURL(file));
 
     // Check nearby fish
     const checkLat = useManualCoords ? parseFloat(manualLat) : lat;
     const checkLng = useManualCoords ? parseFloat(manualLng) : lng;
     if (checkLat && checkLng) {
-      api.nearbyFish(checkLat, checkLng)
-        .then(setNearbyFish)
-        .catch(() => setNearbyFish([]));
+      try {
+        const nearby = await api.nearbyFish(checkLat, checkLng);
+        setNearbyFish(nearby);
+      } catch {
+        setNearbyFish([]);
+      }
     }
 
-    setStep('confirm');
-  }
-
-  // Convert data URL to Blob
-  function dataURLtoBlob(dataUrl: string): Blob {
-    const parts = dataUrl.split(',');
-    const mime = parts[0].match(/:(.*?);/)![1];
-    const bytes = atob(parts[1]);
-    const buf = new Uint8Array(bytes.length);
-    for (let i = 0; i < bytes.length; i++) buf[i] = bytes.charCodeAt(i);
-    return new Blob([buf], { type: mime });
-  }
-
-  // ── File fallback ────────────────────────────────────────────────
-  async function handleFileInput(e: Event) {
-    const input = e.target as HTMLInputElement;
-    const file = input.files?.[0];
-    if (!file) return;
-    setPhotoBlob(file);
-    setPhotoUrl(URL.createObjectURL(file));
     setStep('confirm');
   }
 
@@ -147,7 +94,7 @@ export function SpotPage() {
       return;
     }
     if (!photoBlob) {
-      alert('Najpierw zrób zdjęcie');
+      alert('Najpierw wybierz zdjęcie');
       return;
     }
 
@@ -213,9 +160,9 @@ export function SpotPage() {
 
       {step === 'start' && (
         <div class="spot-start">
-          <p>Zrób zdjęcie rybie w miejscu, gdzie ją znalazłeś.</p>
+          <p>Zrób zdjęcie rybie aparatem, potem wybierz je z galerii.</p>
           <p style="font-size:13px;color:#7F8C8D;text-align:center;">
-            Aparat otworzy się w przeglądarce — nie wychodzisz z apki.
+            📸 Zrób zdjęcie w aplikcji aparatu → wróć tu → kliknij przycisk.
           </p>
 
           {gpsStatus === 'failed' && (
@@ -225,28 +172,16 @@ export function SpotPage() {
           )}
 
           <button class="btn btn-primary" onClick={startCapture} disabled={loading}>
-            {loading ? 'Pobieranie lokalizacji…' : 'Zrób zdjęcie! 📷'}
+            {loading ? 'Pobieranie lokalizacji…' : 'Wybierz zdjęcie z galerii 📂'}
           </button>
 
-          {/* Hidden file input — fallback for desktop / denied camera */}
           <input
             ref={fileInputRef}
             type="file"
             accept="image/*"
-            capture="environment"
             style={{ display: 'none' }}
             onChange={handleFileInput}
           />
-        </div>
-      )}
-
-      {step === 'photo' && (
-        <div class="camera-view">
-          <video ref={videoRef} autoplay playsinline class="camera-video" />
-          <canvas ref={canvasRef} style={{ display: 'none' }} />
-          <button class="btn btn-primary capture-btn" onClick={capturePhoto}>
-            Zrób zdjęcie! 📸
-          </button>
         </div>
       )}
 
