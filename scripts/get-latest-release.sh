@@ -43,6 +43,11 @@ cp /tmp/rybaspotting-release/rybaspotting "${OUTDIR}/"
 rm -rf "${OUTDIR}/frontend"
 cp -r /tmp/rybaspotting-release/frontend "${OUTDIR}/"
 systemctl start rybaspotting
+
+echo ""
+echo "=== Updating nginx config ==="
+cp /tmp/rybaspotting-release/nginx.conf /etc/nginx/sites-available/rybaspotting
+nginx -t && systemctl reload nginx
 echo ""
 
 echo "=== Done! ==="
