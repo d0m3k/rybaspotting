@@ -1,4 +1,4 @@
-import { useState, useRef } from 'preact/hooks';
+import { useState, useRef, useEffect } from 'preact/hooks';
 import { api } from '../api';
 import { LocationPicker } from '../components/LocationPicker';
 
@@ -19,7 +19,15 @@ export function SpotPage() {
   const [addressHint, setAddressHint] = useState('');
   const [message, setMessage] = useState('');
   const [showMapPicker, setShowMapPicker] = useState(false);
+
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // ── Camera capture state ──────────────────────────────────────────
+  const [stream, setStream] = useState<MediaStream | null>(null);
+  const [hasCamera, setHasCamera] = useState<boolean | null>(null);
+  const [facingMode, setFacingMode] = useState<'environment' | 'user'>('environment');
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const streamRef = useRef<MediaStream | null>(null);
 
   // ── Geolocation ───────────────────────────────────────────────────
   async function getLocation(): Promise<{ lat: number; lng: number } | null> {
@@ -37,51 +45,236 @@ export function SpotPage() {
     }
   }
 
-  // ── Start: get location, then open gallery ───────────────────────
-  async function startCapture() {
-    setLoading(true);
-    setGpsStatus('loading');
-
-    const loc = await getLocation();
-    if (loc) {
-      setLat(loc.lat);
-      setLng(loc.lng);
-      setManualLat(String(loc.lat));
-      setManualLng(String(loc.lng));
-      setGpsStatus('ok');
-    } else {
-      setGpsStatus('failed');
-      setUseManualCoords(true);
+  // ── Camera management ─────────────────────────────────────────────
+  async function startCamera(mode: 'environment' | 'user') {
+    // Stop any existing stream
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach((track) => track.stop());
+      streamRef.current = null;
     }
+    setStream(null);
 
-    setLoading(false);
-    // Open file picker — on mobile this is the gallery (in-app overlay, no backgrounding).
-    // User should take the photo with their camera app before coming here.
-    fileInputRef.current?.click();
+    try {
+      const constraints: MediaStreamConstraints = {
+        video: {
+          facingMode: mode,
+          width: { ideal: 1280 },
+          height: { ideal: 720 },
+        },
+        audio: false,
+      };
+      const mediaStream = await navigator.mediaDevices.getUserMedia(constraints);
+      setStream(mediaStream);
+      streamRef.current = mediaStream;
+      setHasCamera(true);
+    } catch (err) {
+      console.error('Failed to get camera with mode', mode, err);
+      // Fallback: try default camera without facingMode constraint
+      if (mode === 'environment') {
+        try {
+          const fallbackStream = await navigator.mediaDevices.getUserMedia({
+            video: true,
+            audio: false,
+          });
+          setStream(fallbackStream);
+          streamRef.current = fallbackStream;
+          setHasCamera(true);
+          return;
+        } catch (e) {
+          console.error('All camera attempts failed', e);
+        }
+      }
+      setHasCamera(false);
+    }
   }
 
-  // ── File selected ────────────────────────────────────────────────
+  function stopCamera() {
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach((track) => track.stop());
+      streamRef.current = null;
+    }
+    setStream(null);
+  }
+
+  function toggleCamera() {
+    const newMode = facingMode === 'environment' ? 'user' : 'environment';
+    setFacingMode(newMode);
+    startCamera(newMode);
+  }
+
+  // Initialize camera and location on mount
+  useEffect(() => {
+    // Start getting location immediately
+    setGpsStatus('loading');
+    getLocation().then((loc) => {
+      if (loc) {
+        setLat(loc.lat);
+        setLng(loc.lng);
+        setManualLat(String(loc.lat));
+        setManualLng(String(loc.lng));
+        setGpsStatus('ok');
+      } else {
+        setGpsStatus('failed');
+        setUseManualCoords(true);
+      }
+    });
+
+    // Start camera stream
+    startCamera(facingMode);
+
+    return () => {
+      // Clean up camera stream on unmount
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach((track) => track.stop());
+      }
+    };
+  }, []);
+
+  // Update srcObject on video ref when stream changes or step returns to start
+  useEffect(() => {
+    if (videoRef.current && stream) {
+      videoRef.current.srcObject = stream;
+    }
+  }, [stream, step]);
+
+  // ── Capture from inline camera ────────────────────────────────────
+  function capturePhoto() {
+    if (!videoRef.current) return;
+    setLoading(true);
+
+    const video = videoRef.current;
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d');
+    if (!ctx) {
+      setLoading(false);
+      return;
+    }
+
+    const videoWidth = video.videoWidth;
+    const videoHeight = video.videoHeight;
+
+    // Scale down image to max 1200px width/height (matches backend MaxPhotoWidth)
+    const maxDim = 1200;
+    let targetWidth = videoWidth;
+    let targetHeight = videoHeight;
+    if (videoWidth > maxDim || videoHeight > maxDim) {
+      if (videoWidth > videoHeight) {
+        targetWidth = maxDim;
+        targetHeight = Math.round((videoHeight / videoWidth) * maxDim);
+      } else {
+        targetHeight = maxDim;
+        targetWidth = Math.round((videoWidth / videoHeight) * maxDim);
+      }
+    }
+
+    canvas.width = targetWidth;
+    canvas.height = targetHeight;
+    ctx.drawImage(video, 0, 0, targetWidth, targetHeight);
+
+    canvas.toBlob(
+      (blob) => {
+        if (blob) {
+          setPhotoBlob(blob);
+          if (photoUrl) URL.revokeObjectURL(photoUrl);
+          setPhotoUrl(URL.createObjectURL(blob));
+
+          // Stop camera stream to release hardware
+          stopCamera();
+
+          // Check nearby fish
+          const checkLat = useManualCoords ? parseFloat(manualLat) : lat;
+          const checkLng = useManualCoords ? parseFloat(manualLng) : lng;
+          if (checkLat && checkLng) {
+            api.nearbyFish(checkLat, checkLng)
+              .then(setNearbyFish)
+              .catch(() => setNearbyFish([]));
+          }
+
+          setStep('confirm');
+        }
+        setLoading(false);
+      },
+      'image/jpeg',
+      0.85
+    );
+  }
+
+  // ── File selected (gallery fallback) ──────────────────────────────
   async function handleFileInput(e: Event) {
     const input = e.target as HTMLInputElement;
     const file = input.files?.[0];
     if (!file) return;
 
-    setPhotoBlob(file);
-    setPhotoUrl(URL.createObjectURL(file));
+    setLoading(true);
+    stopCamera();
 
-    // Check nearby fish
-    const checkLat = useManualCoords ? parseFloat(manualLat) : lat;
-    const checkLng = useManualCoords ? parseFloat(manualLng) : lng;
-    if (checkLat && checkLng) {
-      try {
-        const nearby = await api.nearbyFish(checkLat, checkLng);
-        setNearbyFish(nearby);
-      } catch {
-        setNearbyFish([]);
+    try {
+      const img = new Image();
+      img.src = URL.createObjectURL(file);
+      await new Promise((resolve, reject) => {
+        img.onload = resolve;
+        img.onerror = reject;
+      });
+
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d');
+      if (ctx) {
+        const maxDim = 1200;
+        let w = img.width;
+        let h = img.height;
+        if (w > maxDim || h > maxDim) {
+          if (w > h) {
+            h = Math.round((h / w) * maxDim);
+            w = maxDim;
+          } else {
+            w = Math.round((w / h) * maxDim);
+            h = maxDim;
+          }
+        }
+        canvas.width = w;
+        canvas.height = h;
+        ctx.drawImage(img, 0, 0, w, h);
+
+        canvas.toBlob(
+          (blob) => {
+            URL.revokeObjectURL(img.src);
+            if (blob) {
+              setPhotoBlob(blob);
+              if (photoUrl) URL.revokeObjectURL(photoUrl);
+              setPhotoUrl(URL.createObjectURL(blob));
+
+              // Check nearby fish
+              const checkLat = useManualCoords ? parseFloat(manualLat) : lat;
+              const checkLng = useManualCoords ? parseFloat(manualLng) : lng;
+              if (checkLat && checkLng) {
+                api.nearbyFish(checkLat, checkLng)
+                  .then(setNearbyFish)
+                  .catch(() => setNearbyFish([]));
+              }
+
+              setStep('confirm');
+            } else {
+              setPhotoBlob(file);
+              if (photoUrl) URL.revokeObjectURL(photoUrl);
+              setPhotoUrl(URL.createObjectURL(file));
+              setStep('confirm');
+            }
+            setLoading(false);
+          },
+          'image/jpeg',
+          0.85
+        );
+      } else {
+        throw new Error('Could not get canvas context');
       }
+    } catch (err) {
+      console.error('Failed to resize selected image', err);
+      setPhotoBlob(file);
+      if (photoUrl) URL.revokeObjectURL(photoUrl);
+      setPhotoUrl(URL.createObjectURL(file));
+      setStep('confirm');
+      setLoading(false);
     }
-
-    setStep('confirm');
   }
 
   // ── Submit ───────────────────────────────────────────────────────
@@ -129,6 +322,7 @@ export function SpotPage() {
   function reset() {
     setStep('start');
     setPhotoBlob(null);
+    if (photoUrl) URL.revokeObjectURL(photoUrl);
     setPhotoUrl('');
     setLat(0);
     setLng(0);
@@ -140,6 +334,24 @@ export function SpotPage() {
     setAddressHint('');
     setMessage('');
     if (fileInputRef.current) fileInputRef.current.value = '';
+
+    // Restart geolocation
+    setGpsStatus('loading');
+    getLocation().then((loc) => {
+      if (loc) {
+        setLat(loc.lat);
+        setLng(loc.lng);
+        setManualLat(String(loc.lat));
+        setManualLng(String(loc.lng));
+        setGpsStatus('ok');
+      } else {
+        setGpsStatus('failed');
+        setUseManualCoords(true);
+      }
+    });
+
+    // Restart camera
+    startCamera(facingMode);
   }
 
   // ── Render ───────────────────────────────────────────────────────
@@ -160,20 +372,93 @@ export function SpotPage() {
 
       {step === 'start' && (
         <div class="spot-start">
-          <p>Zrób zdjęcie rybie aparatem, potem wybierz je z galerii.</p>
-          <p style="font-size:13px;color:#7F8C8D;text-align:center;">
-            📸 Zrób zdjęcie w aplikcji aparatu → wróć tu → kliknij przycisk.
-          </p>
-
-          {gpsStatus === 'failed' && (
-            <p style={{ color: '#7F8C8D', fontSize: '13px', textAlign: 'center' }}>
-              ℹ️ Lokalizacja niedostępna — będziesz mógł wpisać współrzędne ręcznie.
-            </p>
+          {hasCamera === null && (
+            <div style={{ textAlign: 'center', padding: '20px 0' }}>
+              <p>Uruchamianie aparatu i pobieranie lokalizacji... ⏳</p>
+            </div>
           )}
 
-          <button class="btn btn-primary" onClick={startCapture} disabled={loading}>
-            {loading ? 'Pobieranie lokalizacji…' : 'Wybierz zdjęcie z galerii 📂'}
-          </button>
+          {hasCamera === true && (
+            <div class="camera-view">
+              <div style={{ position: 'relative', width: '100%' }}>
+                <video
+                  ref={videoRef}
+                  autoPlay
+                  playsInline
+                  muted
+                  class="camera-video"
+                  style={{ width: '100%', borderRadius: '14px', background: '#000', display: 'block' }}
+                />
+                <button
+                  type="button"
+                  onClick={toggleCamera}
+                  style={{
+                    position: 'absolute',
+                    top: '12px',
+                    right: '12px',
+                    background: 'rgba(0, 0, 0, 0.6)',
+                    color: '#fff',
+                    border: 'none',
+                    borderRadius: '50%',
+                    width: '40px',
+                    height: '40px',
+                    fontSize: '18px',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    backdropFilter: 'blur(4px)',
+                    zIndex: 10
+                  }}
+                  title="Przełącz aparat"
+                >
+                  🔄
+                </button>
+              </div>
+
+              <div style={{ textAlign: 'center', margin: '4px 0', fontSize: '13px', color: '#7F8C8D' }}>
+                {gpsStatus === 'loading' && <span>📡 Pobieranie GPS...</span>}
+                {gpsStatus === 'ok' && <span style={{ color: '#2ECC71' }}>📍 Lokalizacja GPS pobrana</span>}
+                {gpsStatus === 'failed' && <span style={{ color: '#E74C3C' }}>⚠️ Brak GPS (będziesz mógł wpisać ręcznie)</span>}
+              </div>
+
+              <button
+                class="btn btn-primary capture-btn"
+                onClick={capturePhoto}
+                disabled={loading}
+              >
+                {loading ? 'Przetwarzanie...' : 'Zrób zdjęcie 📸'}
+              </button>
+
+              <button
+                class="btn btn-secondary"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={loading}
+              >
+                Wybierz z galerii 📂
+              </button>
+            </div>
+          )}
+
+          {hasCamera === false && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', textAlign: 'center' }}>
+              <p>Aparat jest niedostępny lub brak uprawnień.</p>
+              
+              <div style={{ textAlign: 'center', fontSize: '13px', color: '#7F8C8D' }}>
+                {gpsStatus === 'loading' && <span>📡 Pobieranie GPS...</span>}
+                {gpsStatus === 'ok' && <span style={{ color: '#2ECC71' }}>📍 Lokalizacja GPS pobrana</span>}
+                {gpsStatus === 'failed' && <span style={{ color: '#E74C3C' }}>⚠️ Brak GPS (będziesz mógł wpisać ręcznie)</span>}
+              </div>
+
+              <button
+                class="btn btn-primary"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={loading}
+              >
+                Wybierz zdjęcie z galerii 📂
+              </button>
+            </div>
+          )}
 
           <input
             ref={fileInputRef}
@@ -267,6 +552,22 @@ export function SpotPage() {
 
           <button class="btn btn-primary" onClick={handleSubmitNew} disabled={loading}>
             {loading ? 'Wysyłanie...' : 'Nowa ryba! 🐟'}
+          </button>
+
+          <button
+            class="btn btn-secondary"
+            style={{ marginTop: '8px', background: '#95A5A6', boxShadow: 'none' }}
+            onClick={() => {
+              setStep('start');
+              setPhotoBlob(null);
+              if (photoUrl) URL.revokeObjectURL(photoUrl);
+              setPhotoUrl('');
+              setNearbyFish([]);
+              startCamera(facingMode);
+            }}
+            disabled={loading}
+          >
+            Anuluj / Zrób inne zdjęcie ↩️
           </button>
         </div>
       )}
