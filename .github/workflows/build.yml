@@ -49,9 +49,37 @@ jobs:
           cp .env.example release/
           tar -czf rybaspotting-release.tar.gz -C release .
 
-      - name: Upload artifact
+      - name: Upload artifact (for GitHub Actions tab)
         uses: actions/upload-artifact@v4
         with:
           name: rybaspotting-release
           path: rybaspotting-release.tar.gz
           retention-days: 7
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        if: github.ref == 'refs/heads/master'
+        with:
+          tag_name: build-${{ github.run_number }}-${{ github.sha }}
+          name: "Build #${{ github.run_number }} — ${{ github.event.head_commit.message }}"
+          body: |
+            Automated build from commit ${{ github.sha }}.
+
+            ## 🔧 Changes
+            ```
+            ${{ github.event.head_commit.message }}
+            ```
+
+            ## 📥 Download
+            Attached: `rybaspotting-release.tar.gz` — contains backend binary + frontend dist.
+
+            ## 🚀 Deploy on server
+            ```bash
+            wget \${{ github.server_url }}/\${{ github.repository }}/releases/download/build-\${{ github.run_number }}-\${{ github.sha }}/rybaspotting-release.tar.gz
+            tar -xzf rybaspotting-release.tar.gz -C /opt/rybaspotting/
+            systemctl restart rybaspotting
+            ```
+          files: |
+            rybaspotting-release.tar.gz
+          generate_release_notes: false
+          prerelease: false
