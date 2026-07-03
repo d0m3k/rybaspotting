@@ -98,7 +98,6 @@ func main() {
 		// Auth-protected endpoints
 		r.Group(func(r chi.Router) {
 			r.Use(middleware.AuthMiddleware(cfg))
-			r.Use(middleware.RequireActive)
 
 			r.Post("/fish", fishH.Create)
 			r.Post("/fish/{id}/collect", collectH.Collect)
@@ -111,10 +110,9 @@ func main() {
 			r.Group(func(r chi.Router) {
 				r.Use(middleware.RequireAdmin)
 
-				r.Post("/admin/approve-user", adminH.ApproveUser)
+				r.Post("/admin/promote", adminH.PromoteUser)
 				r.Post("/admin/toggle-upload-mode", adminH.ToggleGalleryUpload)
 				r.Get("/admin/stats", adminH.Stats)
-			r.Post("/admin/promote", adminH.PromoteUser)
 			})
 		})
 	})
@@ -169,9 +167,9 @@ func seedDevData(conn *sql.DB, cfg *config.Config) error {
 	var adminID, demoID, rybkaID int
 
 	err := conn.QueryRow(
-		`INSERT INTO users (username, password_hash, display_name, is_active, is_admin)
-		 VALUES ($1, $2, $3, $4, $5) ON CONFLICT (username) DO UPDATE SET username=EXCLUDED.username RETURNING id`,
-		"admin", hash("admin123"), "Administrator", true, true,
+		`INSERT INTO users (username, password_hash, display_name, is_admin)
+		 VALUES ($1, $2, $3, $4) ON CONFLICT (username) DO UPDATE SET username=EXCLUDED.username RETURNING id`,
+		"admin", hash("admin123"), "Administrator", true,
 	).Scan(&adminID)
 	if err != nil {
 		return fmt.Errorf("create admin: %w", err)
@@ -179,16 +177,16 @@ func seedDevData(conn *sql.DB, cfg *config.Config) error {
 	log.Printf("  admin (id=%d) — login: admin / admin123", adminID)
 
 	conn.QueryRow(
-		`INSERT INTO users (username, password_hash, display_name, is_active, is_admin)
-		 VALUES ($1, $2, $3, $4, $5) ON CONFLICT (username) DO UPDATE SET username=EXCLUDED.username RETURNING id`,
-		"demo", hash("demo123"), "Demo User", true, false,
+		`INSERT INTO users (username, password_hash, display_name, is_admin)
+		 VALUES ($1, $2, $3, $4) ON CONFLICT (username) DO UPDATE SET username=EXCLUDED.username RETURNING id`,
+		"demo", hash("demo123"), "Demo User", false,
 	).Scan(&demoID)
 	log.Printf("  demo (id=%d) — login: demo / demo123", demoID)
 
 	conn.QueryRow(
-		`INSERT INTO users (username, password_hash, display_name, is_active, is_admin)
-		 VALUES ($1, $2, $3, $4, $5) ON CONFLICT (username) DO UPDATE SET username=EXCLUDED.username RETURNING id`,
-		"rybka", hash("rybka123"), "Rybka Fan", true, false,
+		`INSERT INTO users (username, password_hash, display_name, is_admin)
+		 VALUES ($1, $2, $3, $4) ON CONFLICT (username) DO UPDATE SET username=EXCLUDED.username RETURNING id`,
+		"rybka", hash("rybka123"), "Rybka Fan", false,
 	).Scan(&rybkaID)
 	log.Printf("  rybka (id=%d) — login: rybka / rybka123", rybkaID)
 

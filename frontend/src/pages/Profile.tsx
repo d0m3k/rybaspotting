@@ -6,7 +6,6 @@ interface UserStats {
   user_id: number;
   username: string;
   display_name: string;
-  is_active: boolean;
   is_admin: boolean;
   spotted: number;
   collected: number;
@@ -54,10 +53,6 @@ export function ProfilePage({ auth, onLogout }: Props) {
 
         <div class="profile-badges">
           {auth.isAdmin && <span class="profile-badge badge-admin">🔑 Admin</span>}
-          {auth.isActive
-            ? <span class="profile-badge badge-active">✅ Aktywny</span>
-            : <span class="profile-badge badge-pending">⏳ Oczekuje</span>
-          }
         </div>
 
         {stats && (
@@ -65,7 +60,7 @@ export function ProfilePage({ auth, onLogout }: Props) {
             <div class="profile-stat">
               <div class="stats-fish-icon">📸</div>
               <div class="stat-count spotted">{stats.spotted}</div>
-              <div class="stat-label">Zesputed</div>
+              <div class="stat-label">Spotted</div>
             </div>
             <div class="profile-stat">
               <div class="stats-fish-icon">🎣</div>

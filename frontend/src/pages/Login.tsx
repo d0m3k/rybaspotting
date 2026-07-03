@@ -25,7 +25,6 @@ export function LoginPage({ onLogin, onRegister }: Props) {
         userId: res.user_id,
         username: res.username,
         displayName: res.display_name,
-        isActive: res.is_active,
         isAdmin: res.is_admin,
       });
     } catch (err: any) {

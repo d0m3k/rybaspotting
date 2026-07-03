@@ -44,12 +44,12 @@ func (h *FishHandler) Create(w http.ResponseWriter, r *http.Request) {
 	}
 
 	lat, err := strconv.ParseFloat(r.FormValue("latitude"), 64)
-	if err != nil {
+	if err != nil || math.IsNaN(lat) || math.IsInf(lat, 0) {
 		http.Error(w, `{"error":"invalid latitude"}`, http.StatusBadRequest)
 		return
 	}
 	lng, err := strconv.ParseFloat(r.FormValue("longitude"), 64)
-	if err != nil {
+	if err != nil || math.IsNaN(lng) || math.IsInf(lng, 0) {
 		http.Error(w, `{"error":"invalid longitude"}`, http.StatusBadRequest)
 		return
 	}
@@ -75,11 +75,11 @@ func (h *FishHandler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Downscale to MaxPhotoWidth
-	resized := imaging.Fit(src, h.Cfg.MaxPhotoWidth, 0, imaging.Lanczos)
+	// Downscale to MaxPhotoWidth (Resize handles height=0 as "auto")
+	resized := imaging.Resize(src, h.Cfg.MaxPhotoWidth, 0, imaging.Lanczos)
 
 	// Generate thumbnail (200px wide)
-	thumb := imaging.Fit(src, 200, 0, imaging.Lanczos)
+	thumb := imaging.Resize(src, 200, 0, imaging.Lanczos)
 
 	// Insert fish row to get ID
 	var fishID int
@@ -183,6 +183,7 @@ func (h *FishHandler) List(w http.ResponseWriter, r *http.Request) {
 		 ORDER BY f.created_at DESC
 		 LIMIT $1 OFFSET $2`, limit, offset)
 	if err != nil {
+		log.Printf("[FISH] List query error: %v", err)
 		http.Error(w, `{"error":"internal error"}`, http.StatusInternalServerError)
 		return
 	}
@@ -193,9 +194,17 @@ func (h *FishHandler) List(w http.ResponseWriter, r *http.Request) {
 		var f models.Fish
 		if err := rows.Scan(&f.ID, &f.PhotoFilename, &f.Latitude, &f.Longitude,
 			&f.AddressHint, &f.SpottedBy, &f.SpotterName, &f.CreatedAt); err != nil {
+			log.Printf("[FISH] List scan error: %v", err)
+			continue
+		}
+		if math.IsNaN(f.Latitude) || math.IsNaN(f.Longitude) {
+			log.Printf("[FISH] List skipping fish %d with NaN coords", f.ID)
 			continue
 		}
 		fishList = append(fishList, f)
+	}
+	if err := rows.Err(); err != nil {
+		log.Printf("[FISH] List rows error: %v", err)
 	}
 
 	writeJSON(w, http.StatusOK, fishList)

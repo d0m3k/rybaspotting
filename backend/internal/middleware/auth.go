@@ -15,13 +15,12 @@ import (
 type contextKey string
 
 const (
-	ContextUserID   contextKey = "user_id"
-	ContextIsActive contextKey = "is_active"
-	ContextIsAdmin  contextKey = "is_admin"
+	ContextUserID  contextKey = "user_id"
+	ContextIsAdmin contextKey = "is_admin"
 )
 
 // AuthMiddleware returns an HTTP middleware that validates JWT tokens.
-// It injects user_id, is_active, is_admin into the request context.
+// It injects user_id and is_admin into the request context.
 func AuthMiddleware(cfg *config.Config) func(next http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -54,25 +53,22 @@ func AuthMiddleware(cfg *config.Config) func(next http.Handler) http.Handler {
 				return
 			}
 
-			// Extract claims
 			userID := int(claims["user_id"].(float64))
-			isActive := claims["is_active"].(bool)
-			isAdmin := claims["is_admin"].(bool)
+			isAdmin, _ := claims["is_admin"].(bool)
 
 			ctx := context.WithValue(r.Context(), ContextUserID, userID)
-			ctx = context.WithValue(ctx, ContextIsActive, isActive)
 			ctx = context.WithValue(ctx, ContextIsAdmin, isAdmin)
 			next.ServeHTTP(w, r.WithContext(ctx))
 		})
 	}
 }
 
-// RequireActive returns middleware that rejects inactive users.
-func RequireActive(next http.Handler) http.Handler {
+// RequireAdmin returns middleware that rejects non-admin users.
+func RequireAdmin(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		isActive, _ := r.Context().Value(ContextIsActive).(bool)
-		if !isActive {
-			http.Error(w, `{"error":"account not yet approved"}`, http.StatusForbidden)
+		isAdmin, _ := r.Context().Value(ContextIsAdmin).(bool)
+		if !isAdmin {
+			http.Error(w, `{"error":"admin access required"}`, http.StatusForbidden)
 			return
 		}
 		next.ServeHTTP(w, r)
@@ -80,12 +76,11 @@ func RequireActive(next http.Handler) http.Handler {
 }
 
 // GenerateToken creates a JWT token for the given user.
-func GenerateToken(cfg *config.Config, userID int, isActive, isAdmin bool) (string, error) {
+func GenerateToken(cfg *config.Config, userID int, isAdmin bool) (string, error) {
 	claims := jwt.MapClaims{
-		"user_id":   userID,
-		"is_active": isActive,
-		"is_admin":  isAdmin,
-		"iat":       time.Now().Unix(),
+		"user_id":  userID,
+		"is_admin": isAdmin,
+		"iat":      time.Now().Unix(),
 	}
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
 	return token.SignedString([]byte(cfg.JWTSecret))

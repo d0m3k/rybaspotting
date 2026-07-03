@@ -1,5 +1,6 @@
 import { useState, useRef } from 'preact/hooks';
 import { api } from '../api';
+import { LocationPicker } from '../components/LocationPicker';
 
 type Step = 'start' | 'confirm' | 'done';
 
@@ -17,6 +18,7 @@ export function SpotPage() {
   const [loading, setLoading] = useState(false);
   const [addressHint, setAddressHint] = useState('');
   const [message, setMessage] = useState('');
+  const [showMapPicker, setShowMapPicker] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // ── Geolocation + trigger native camera ─────────────────────────────
@@ -189,6 +191,24 @@ export function SpotPage() {
 
       {step === 'confirm' && (
         <div class="confirm-view">
+          {showMapPicker && (
+            <LocationPicker
+              initialLat={lat || 50.0647}
+              initialLng={lng || 19.9450}
+              onConfirm={(newLat, newLng, address) => {
+                setLat(newLat);
+                setLng(newLng);
+                setManualLat(String(newLat));
+                setManualLng(String(newLng));
+                setUseManualCoords(false);
+                setGpsStatus('ok');
+                if (address) setAddressHint(address);
+                setShowMapPicker(false);
+              }}
+              onCancel={() => setShowMapPicker(false)}
+            />
+          )}
+
           <img src={photoUrl} alt="captured" class="photo-preview" />
 
           {/* ── Coordinates section ── */}
@@ -199,9 +219,9 @@ export function SpotPage() {
               <a
                 href="#"
                 style={{ fontSize: '12px', color: '#4ECDC4' }}
-                onClick={(e) => { e.preventDefault(); setUseManualCoords(true); }}
+                onClick={(e) => { e.preventDefault(); setShowMapPicker(true); }}
               >
-                (edytuj)
+                (zmień na mapie)
               </a>
             </p>
           )}
@@ -231,26 +251,34 @@ export function SpotPage() {
                   onInput={(e: any) => setManualLng(e.target.value)}
                 />
               </div>
-              <button
-                class="btn btn-secondary"
-                style={{ marginBottom: '12px' }}
-                onClick={() => {
-                  navigator.geolocation.getCurrentPosition(
-                    (pos) => {
-                      setLat(pos.coords.latitude);
-                      setLng(pos.coords.longitude);
-                      setManualLat(String(pos.coords.latitude));
-                      setManualLng(String(pos.coords.longitude));
-                      setUseManualCoords(false);
-                      setGpsStatus('ok');
-                    },
-                    () => alert('Nadal nie można pobrać lokalizacji'),
-                    { enableHighAccuracy: true, timeout: 10000 }
-                  );
-                }}
-              >
-                📡 Spróbuj ponownie GPS
-              </button>
+              <div style={{ display: 'flex', gap: '8px', marginBottom: '12px' }}>
+                <button
+                  class="btn btn-secondary"
+                  style={{ flex: 1, fontSize: '14px', padding: '10px' }}
+                  onClick={() => setShowMapPicker(true)}
+                >
+                  🗺️ Wybierz na mapie
+                </button>
+                <button
+                  style={{ flex: 1, fontSize: '14px', padding: '10px', background: '#fff', color: '#4ECDC4', border: '2px solid #4ECDC4', borderRadius: '12px', cursor: 'pointer', fontWeight: 600 }}
+                  onClick={() => {
+                    navigator.geolocation.getCurrentPosition(
+                      (pos) => {
+                        setLat(pos.coords.latitude);
+                        setLng(pos.coords.longitude);
+                        setManualLat(String(pos.coords.latitude));
+                        setManualLng(String(pos.coords.longitude));
+                        setUseManualCoords(false);
+                        setGpsStatus('ok');
+                      },
+                      () => alert('Nadal nie można pobrać lokalizacji'),
+                      { enableHighAccuracy: true, timeout: 10000 }
+                    );
+                  }}
+                >
+                  📡 GPS
+                </button>
+              </div>
             </div>
           )}
 

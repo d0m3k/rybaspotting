@@ -22,7 +22,6 @@ func (h *LeaderboardHandler) Get(w http.ResponseWriter, r *http.Request) {
 		`SELECT u.username, COUNT(f.id) AS count
 		 FROM users u
 		 JOIN fish f ON f.spotted_by = u.id
-		 WHERE u.is_active = true
 		 GROUP BY u.id, u.username
 		 ORDER BY count DESC
 		 LIMIT 50`,
@@ -42,7 +41,6 @@ func (h *LeaderboardHandler) Get(w http.ResponseWriter, r *http.Request) {
 		`SELECT u.username, COUNT(c.id) AS count
 		 FROM users u
 		 JOIN collections c ON c.user_id = u.id
-		 WHERE u.is_active = true
 		 GROUP BY u.id, u.username
 		 ORDER BY count DESC
 		 LIMIT 50`,

@@ -8,7 +8,6 @@ CREATE TABLE IF NOT EXISTS users (
     username    VARCHAR(255) NOT NULL UNIQUE,
     password_hash VARCHAR(255) NOT NULL,
     display_name VARCHAR(255) NOT NULL DEFAULT '',
-    is_active   BOOLEAN NOT NULL DEFAULT false,
     is_admin    BOOLEAN NOT NULL DEFAULT false,
     created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );

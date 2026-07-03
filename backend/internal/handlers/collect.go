@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"database/sql"
+	"log"
 	"net/http"
 	"strconv"
 
@@ -52,6 +53,12 @@ func (h *CollectHandler) Collect(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, `{"error":"already collected"}`, http.StatusConflict)
 		return
 	}
+
+	// Get spotter name for the log
+	var spotterName string
+	h.DB.QueryRow(`SELECT u.username FROM fish f JOIN users u ON u.id = f.spotted_by WHERE f.id = $1`, fishID).Scan(&spotterName)
+
+	log.Printf("[FISH] type=collected fish_id=%d user_id=%d spotter=%s", fishID, userID, spotterName)
 
 	writeJSON(w, http.StatusOK, map[string]string{"message": "collected"})
 }

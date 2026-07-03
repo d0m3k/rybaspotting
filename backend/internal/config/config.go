@@ -10,7 +10,6 @@ import (
 type Config struct {
 	DatabaseURL        string
 	JWTSecret          string
-	AdminToken         string
 	ListenAddr         string
 	PhotoDir           string
 	NearbyRadiusMeters float64
@@ -25,7 +24,6 @@ func Load() *Config {
 	cfg := &Config{
 		DatabaseURL:        getEnv("DATABASE_URL", "postgres://postgres:postgres@localhost:5432/rybaspotting?sslmode=disable"),
 		JWTSecret:          getEnv("JWT_SECRET", "change-me-secret"),
-		AdminToken:         getEnv("ADMIN_TOKEN", "change-me-admin"),
 		ListenAddr:         getEnv("LISTEN_ADDR", "127.0.0.1:8080"),
 		PhotoDir:           getEnv("PHOTO_DIR", "/var/lib/rybaspotting/photos"),
 		NearbyRadiusMeters: getEnvFloat("NEARBY_RADIUS_METERS", 30),

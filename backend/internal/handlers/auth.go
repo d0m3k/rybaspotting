@@ -3,6 +3,7 @@ package handlers
 import (
 	"database/sql"
 	"encoding/json"
+	"log"
 	"net/http"
 	"strings"
 
@@ -34,7 +35,6 @@ type authResponse struct {
 	UserID      int    `json:"user_id"`
 	Username    string `json:"username"`
 	DisplayName string `json:"display_name"`
-	IsActive    bool   `json:"is_active"`
 	IsAdmin     bool   `json:"is_admin"`
 }
 
@@ -63,11 +63,10 @@ func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 
 	var userID int
 	err = h.DB.QueryRow(
-		`INSERT INTO users (username, password_hash, display_name, is_active) VALUES ($1, $2, $3, true) RETURNING id`,
+		`INSERT INTO users (username, password_hash, display_name) VALUES ($1, $2, $3) RETURNING id`,
 		req.Username, string(hash), req.DisplayName,
 	).Scan(&userID)
 	if err != nil {
-		// Check for duplicate username
 		if isPGUniqueViolation(err) {
 			http.Error(w, `{"error":"username already taken"}`, http.StatusConflict)
 			return
@@ -75,6 +74,8 @@ func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, `{"error":"internal error"}`, http.StatusInternalServerError)
 		return
 	}
+
+	log.Printf("[AUTH] type=register user=%s ip=%s id=%d", req.Username, r.RemoteAddr, userID)
 
 	writeJSON(w, http.StatusCreated, map[string]string{
 		"message": "registration successful",
@@ -90,12 +91,12 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 
 	var userID int
 	var username, displayName, passwordHash string
-	var isActive, isAdmin bool
+	var isAdmin bool
 
 	err := h.DB.QueryRow(
-		`SELECT id, username, display_name, password_hash, is_active, is_admin FROM users WHERE username = $1`,
+		`SELECT id, username, display_name, password_hash, is_admin FROM users WHERE username = $1`,
 		req.Username,
-	).Scan(&userID, &username, &displayName, &passwordHash, &isActive, &isAdmin)
+	).Scan(&userID, &username, &displayName, &passwordHash, &isAdmin)
 	if err == sql.ErrNoRows {
 		http.Error(w, `{"error":"invalid credentials"}`, http.StatusUnauthorized)
 		return
@@ -110,18 +111,19 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	token, err := middleware.GenerateToken(h.Cfg, userID, isActive, isAdmin)
+	token, err := middleware.GenerateToken(h.Cfg, userID, isAdmin)
 	if err != nil {
 		http.Error(w, `{"error":"internal error"}`, http.StatusInternalServerError)
 		return
 	}
+
+	log.Printf("[AUTH] type=login user=%s id=%d admin=%v", username, userID, isAdmin)
 
 	writeJSON(w, http.StatusOK, authResponse{
 		Token:       token,
 		UserID:      userID,
 		Username:    username,
 		DisplayName: displayName,
-		IsActive:    isActive,
 		IsAdmin:     isAdmin,
 	})
 }

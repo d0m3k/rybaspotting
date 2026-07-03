@@ -5,7 +5,6 @@ export interface AuthState {
   userId: number;
   username: string;
   displayName: string;
-  isActive: boolean;
   isAdmin: boolean;
 }
 

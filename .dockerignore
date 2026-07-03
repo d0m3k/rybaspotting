@@ -1,0 +1,15 @@
+.env
+.env.*
+.git/
+.gitignore
+dist/
+frontend/dist/
+node_modules/
+.gopath/
+.gomodcache/
+go/
+*.md
+PLAN.md
+reasonix.toml
+scripts/
+deploy/

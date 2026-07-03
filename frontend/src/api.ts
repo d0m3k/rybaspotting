@@ -41,7 +41,7 @@ export const api = {
     }),
 
   login: (username: string, password: string) =>
-    request<{ token: string; user_id: number; username: string; display_name: string; is_active: boolean; is_admin: boolean }>(
+    request<{ token: string; user_id: number; username: string; display_name: string; is_admin: boolean }>(
       '/api/auth/login',
       { method: 'POST', body: JSON.stringify({ username, password }) }
     ),
@@ -80,7 +80,6 @@ export const api = {
       user_id: number;
       username: string;
       display_name: string;
-      is_active: boolean;
       is_admin: boolean;
       spotted: number;
       collected: number;

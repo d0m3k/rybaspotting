@@ -1,0 +1,57 @@
+# Rybaspotting — Build & Release
+# On every push to main, builds backend + frontend and creates a release artifact.
+# Download the artifact and deploy via:
+#   ./scripts/deploy-from-release.sh release.tar.gz root@amy135.mikrus.xyz 10135
+
+name: Build & Release
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.23'
+
+      - name: Build backend
+        run: |
+          cd backend
+          go build -o ../dist/rybaspotting ./cmd/rybaspotting/
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Build frontend
+        run: |
+          cd frontend
+          npm ci
+          npm run build
+
+      - name: Package release
+        run: |
+          mkdir -p release
+          cp dist/rybaspotting release/
+          cp -r frontend/dist release/frontend
+          cp deploy/rybaspotting.service release/
+          cp deploy/nginx.conf release/
+          cp .env.example release/
+          tar -czf rybaspotting-release.tar.gz -C release .
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: rybaspotting-release
+          path: rybaspotting-release.tar.gz
+          retention-days: 7

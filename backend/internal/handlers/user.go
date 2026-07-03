@@ -15,7 +15,6 @@ type userStatsResponse struct {
 	UserID      int    `json:"user_id"`
 	Username    string `json:"username"`
 	DisplayName string `json:"display_name"`
-	IsActive    bool   `json:"is_active"`
 	IsAdmin     bool   `json:"is_admin"`
 	Spotted     int    `json:"spotted"`
 	Collected   int    `json:"collected"`
@@ -29,9 +28,9 @@ func (h *UserHandler) Me(w http.ResponseWriter, r *http.Request) {
 
 	// Get user info
 	err := h.DB.QueryRow(
-		`SELECT username, display_name, is_active, is_admin FROM users WHERE id = $1`,
+		`SELECT username, display_name, is_admin FROM users WHERE id = $1`,
 		userID,
-	).Scan(&resp.Username, &resp.DisplayName, &resp.IsActive, &resp.IsAdmin)
+	).Scan(&resp.Username, &resp.DisplayName, &resp.IsAdmin)
 	if err != nil {
 		http.Error(w, `{"error":"user not found"}`, http.StatusNotFound)
 		return

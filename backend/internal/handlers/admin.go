@@ -22,31 +22,32 @@ type adminStatsResponse struct {
 	PhotoSizeMB  int64 `json:"photo_size_mb"`
 }
 
-// ApproveUser sets is_active = true for a given username.
-// Protected by JWT admin check in the router.
-func (h *AdminHandler) ApproveUser(w http.ResponseWriter, r *http.Request) {
+// PromoteUser promotes a user to admin by username.
+func (h *AdminHandler) PromoteUser(w http.ResponseWriter, r *http.Request) {
 	username := r.URL.Query().Get("username")
 	if username == "" {
 		http.Error(w, `{"error":"username query parameter required"}`, http.StatusBadRequest)
 		return
 	}
 
-	res, err := h.DB.Exec(`UPDATE users SET is_active = true WHERE username = $1 AND is_active = false`, username)
+	res, err := h.DB.Exec(
+		`UPDATE users SET is_admin = true WHERE username = $1`,
+		username,
+	)
 	if err != nil {
 		http.Error(w, `{"error":"internal error"}`, http.StatusInternalServerError)
 		return
 	}
 	rows, _ := res.RowsAffected()
 	if rows == 0 {
-		http.Error(w, `{"error":"user not found or already active"}`, http.StatusNotFound)
+		http.Error(w, `{"error":"user not found"}`, http.StatusNotFound)
 		return
 	}
 
-	// Log who approved whom
 	adminID, _ := r.Context().Value(middleware.ContextUserID).(int)
-	log.Printf("[ADMIN] type=approve_user admin_id=%d target=%s", adminID, username)
+	log.Printf("[ADMIN] type=promote_user admin_id=%d target=%s", adminID, username)
 
-	writeJSON(w, http.StatusOK, map[string]string{"message": "user approved"})
+	writeJSON(w, http.StatusOK, map[string]string{"message": "user promoted to admin"})
 }
 
 // ToggleGalleryUpload flips the runtime allowGalleryUpload flag.
@@ -67,7 +68,6 @@ func (h *AdminHandler) Stats(w http.ResponseWriter, r *http.Request) {
 	h.DB.QueryRow(`SELECT COUNT(*) FROM users`).Scan(&resp.UserCount)
 	h.DB.QueryRow(`SELECT COUNT(*) FROM fish`).Scan(&resp.FishCount)
 
-	// Count photo files in the photo directory
 	if ents, err := os.ReadDir(h.Cfg.PhotoDir); err == nil {
 		for _, e := range ents {
 			if e.IsDir() {
@@ -82,32 +82,4 @@ func (h *AdminHandler) Stats(w http.ResponseWriter, r *http.Request) {
 	resp.PhotoSizeMB = resp.PhotoSizeMB / (1024 * 1024)
 
 	writeJSON(w, http.StatusOK, resp)
-}
-
-// PromoteUser promotes a user to admin by username.
-func (h *AdminHandler) PromoteUser(w http.ResponseWriter, r *http.Request) {
-	username := r.URL.Query().Get("username")
-	if username == "" {
-		http.Error(w, `{"error":"username query parameter required"}`, http.StatusBadRequest)
-		return
-	}
-
-	res, err := h.DB.Exec(
-		`UPDATE users SET is_admin = true, is_active = true WHERE username = $1`,
-		username,
-	)
-	if err != nil {
-		http.Error(w, `{"error":"internal error"}`, http.StatusInternalServerError)
-		return
-	}
-	rows, _ := res.RowsAffected()
-	if rows == 0 {
-		http.Error(w, `{"error":"user not found"}`, http.StatusNotFound)
-		return
-	}
-
-	adminID, _ := r.Context().Value(middleware.ContextUserID).(int)
-	log.Printf("[ADMIN] type=promote_user admin_id=%d target=%s", adminID, username)
-
-	writeJSON(w, http.StatusOK, map[string]string{"message": "user promoted to admin"})
 }
