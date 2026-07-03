@@ -76,7 +76,6 @@ html, body {
 .page {
   padding: 16px;
   position: relative;
-  z-index: 1;
 }
 
 /* === Page Header (with mascot) === */
