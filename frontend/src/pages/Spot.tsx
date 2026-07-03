@@ -79,42 +79,52 @@ export function SpotPage() {
   }
 
   // ── Capture frame from video ─────────────────────────────────────
+  // Uses toDataURL instead of toBlob because toBlob can fail silently on mobile Chrome.
   function capturePhoto() {
     const video = videoRef.current;
     const canvas = canvasRef.current;
-    if (!video || !canvas) return;
+    if (!video || !canvas) {
+      console.warn('capturePhoto: video or canvas ref missing');
+      return;
+    }
 
-    // Use video's natural resolution (already constrained to ~1280px)
     canvas.width = video.videoWidth;
     canvas.height = video.videoHeight;
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
     ctx.drawImage(video, 0, 0);
 
-    canvas.toBlob(
-      (blob) => {
-        if (!blob) return;
-        setPhotoBlob(blob);
-        setPhotoUrl(canvas.toDataURL('image/jpeg'));
+    // dataURL → Blob (synchronous, no silent failure)
+    const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
+    const blob = dataURLtoBlob(dataUrl);
 
-        // Stop camera stream
-        const stream = video.srcObject as MediaStream;
-        stream?.getTracks().forEach((t) => t.stop());
+    setPhotoBlob(blob);
+    setPhotoUrl(dataUrl);
 
-        // Check nearby fish
-        const checkLat = useManualCoords ? parseFloat(manualLat) : lat;
-        const checkLng = useManualCoords ? parseFloat(manualLng) : lng;
-        if (checkLat && checkLng) {
-          api.nearbyFish(checkLat, checkLng)
-            .then(setNearbyFish)
-            .catch(() => setNearbyFish([]));
-        }
+    // Stop camera stream
+    const stream = video.srcObject as MediaStream;
+    stream?.getTracks().forEach((t) => t.stop());
 
-        setStep('confirm');
-      },
-      'image/jpeg',
-      0.85,
-    );
+    // Check nearby fish
+    const checkLat = useManualCoords ? parseFloat(manualLat) : lat;
+    const checkLng = useManualCoords ? parseFloat(manualLng) : lng;
+    if (checkLat && checkLng) {
+      api.nearbyFish(checkLat, checkLng)
+        .then(setNearbyFish)
+        .catch(() => setNearbyFish([]));
+    }
+
+    setStep('confirm');
+  }
+
+  // Convert data URL to Blob
+  function dataURLtoBlob(dataUrl: string): Blob {
+    const parts = dataUrl.split(',');
+    const mime = parts[0].match(/:(.*?);/)![1];
+    const bytes = atob(parts[1]);
+    const buf = new Uint8Array(bytes.length);
+    for (let i = 0; i < bytes.length; i++) buf[i] = bytes.charCodeAt(i);
+    return new Blob([buf], { type: mime });
   }
 
   // ── File fallback ────────────────────────────────────────────────
