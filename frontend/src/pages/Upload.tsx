@@ -2,6 +2,36 @@ import { useState, useRef } from 'preact/hooks';
 import { api } from '../api';
 import { LocationPicker } from '../components/LocationPicker';
 
+// Downscale an image to a maximum width (preserves aspect ratio).
+// Returns a Blob suitable for upload — reduces memory on mobile.
+function downscaleImage(file: File, maxWidth: number): Promise<Blob> {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.onload = () => {
+      URL.revokeObjectURL(url);
+      let w = img.naturalWidth;
+      let h = img.naturalHeight;
+      if (w > maxWidth) {
+        const ratio = maxWidth / w;
+        w = maxWidth;
+        h = Math.round(h * ratio);
+      }
+      const canvas = document.createElement('canvas');
+      canvas.width = w;
+      canvas.height = h;
+      const ctx = canvas.getContext('2d')!;
+      ctx.drawImage(img, 0, 0, w, h);
+      canvas.toBlob(
+        (blob) => { if (blob) resolve(blob); else reject(new Error('toBlob failed')); },
+        'image/jpeg', 0.85
+      );
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); resolve(file); };
+    img.src = url;
+  });
+}
+
 // Lazy import exifr
 let exifr: any = null;
 
@@ -25,10 +55,7 @@ export function UploadPage() {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    setPhotoFile(file);
-    setPhotoUrl(URL.createObjectURL(file));
-
-    // Try to extract EXIF GPS (best-effort — often stripped on Android)
+    // Try to extract EXIF GPS BEFORE downscaling (EXIF is lost after resize)
     let exifLat = 0, exifLng = 0;
     try {
       if (!exifr) {
@@ -42,6 +69,11 @@ export function UploadPage() {
     } catch {
       // EXIF extraction failed — that's normal on modern Android
     }
+
+    // Downscale the image client-side to avoid memory issues on mobile
+    const downscaled = await downscaleImage(file, 1200);
+    setPhotoFile(downscaled);
+    setPhotoUrl(URL.createObjectURL(downscaled));
 
     if (exifLat && exifLng) {
       setLat(exifLat);
