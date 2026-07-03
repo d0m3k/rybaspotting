@@ -387,7 +387,7 @@ export function SpotPage() {
                   playsInline
                   muted
                   class="camera-video"
-                  style={{ width: '100%', borderRadius: '14px', background: '#000', display: 'block' }}
+                  style={{ width: '100%', maxHeight: '45vh', objectFit: 'cover', borderRadius: '14px', background: '#000', display: 'block' }}
                 />
                 <button
                   type="button"
