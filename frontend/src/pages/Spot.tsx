@@ -2,11 +2,12 @@ import { useState, useRef } from 'preact/hooks';
 import { api } from '../api';
 import { LocationPicker } from '../components/LocationPicker';
 
-type Step = 'start' | 'confirm' | 'done';
+type Step = 'start' | 'photo' | 'confirm' | 'done';
 
 export function SpotPage() {
   const [step, setStep] = useState<Step>('start');
-  const [photoFile, setPhotoFile] = useState<File | null>(null);
+  const [photoBlob, setPhotoBlob] = useState<Blob | null>(null);
+  const [photoUrl, setPhotoUrl] = useState<string>('');
   const [lat, setLat] = useState<number>(0);
   const [lng, setLng] = useState<number>(0);
   const [manualLat, setManualLat] = useState('');
@@ -18,33 +19,11 @@ export function SpotPage() {
   const [addressHint, setAddressHint] = useState('');
   const [message, setMessage] = useState('');
   const [showMapPicker, setShowMapPicker] = useState(false);
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // ── Geolocation + trigger native camera ─────────────────────────────
-  async function startCapture() {
-    setLoading(true);
-    setGpsStatus('loading');
-
-    // 1. Try geolocation (non-blocking — we continue either way)
-    const loc = await getLocation();
-    if (loc) {
-      setLat(loc.lat);
-      setLng(loc.lng);
-      setManualLat(String(loc.lat));
-      setManualLng(String(loc.lng));
-      setGpsStatus('ok');
-    } else {
-      setGpsStatus('failed');
-      setUseManualCoords(true);
-    }
-
-    setLoading(false);
-
-    // 2. Open native camera / file picker
-    //    capture="environment" → native camera on mobile, file picker on desktop
-    fileInputRef.current?.click();
-  }
-
+  // ── Geolocation ───────────────────────────────────────────────────
   async function getLocation(): Promise<{ lat: number; lng: number } | null> {
     try {
       const pos = await new Promise<GeolocationPosition>((resolve, reject) => {
@@ -60,43 +39,95 @@ export function SpotPage() {
     }
   }
 
-  // ── File picked (from camera or gallery) ────────────────────────────
+  // ── Main flow ────────────────────────────────────────────────────
+  async function startCapture() {
+    setLoading(true);
+    setGpsStatus('loading');
+
+    // 1. Geolocation (non-blocking)
+    const loc = await getLocation();
+    if (loc) {
+      setLat(loc.lat);
+      setLng(loc.lng);
+      setManualLat(String(loc.lat));
+      setManualLng(String(loc.lng));
+      setGpsStatus('ok');
+    } else {
+      setGpsStatus('failed');
+      setUseManualCoords(true);
+    }
+
+    // 2. Try in-browser camera stream first (no backgrounding = no Android OOM)
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: 'environment', width: { ideal: 1280 } },
+      });
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+        await videoRef.current.play();
+        setStep('photo');
+        setLoading(false);
+        return;
+      }
+    } catch {
+      // Camera denied / no camera → fall back to file picker below
+    }
+
+    // 3. Fallback: file picker (desktop or user denied camera)
+    setLoading(false);
+    fileInputRef.current?.click();
+  }
+
+  // ── Capture frame from video ─────────────────────────────────────
+  function capturePhoto() {
+    const video = videoRef.current;
+    const canvas = canvasRef.current;
+    if (!video || !canvas) return;
+
+    // Use video's natural resolution (already constrained to ~1280px)
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    ctx.drawImage(video, 0, 0);
+
+    canvas.toBlob(
+      (blob) => {
+        if (!blob) return;
+        setPhotoBlob(blob);
+        setPhotoUrl(canvas.toDataURL('image/jpeg'));
+
+        // Stop camera stream
+        const stream = video.srcObject as MediaStream;
+        stream?.getTracks().forEach((t) => t.stop());
+
+        // Check nearby fish
+        const checkLat = useManualCoords ? parseFloat(manualLat) : lat;
+        const checkLng = useManualCoords ? parseFloat(manualLng) : lng;
+        if (checkLat && checkLng) {
+          api.nearbyFish(checkLat, checkLng)
+            .then(setNearbyFish)
+            .catch(() => setNearbyFish([]));
+        }
+
+        setStep('confirm');
+      },
+      'image/jpeg',
+      0.85,
+    );
+  }
+
+  // ── File fallback ────────────────────────────────────────────────
   async function handleFileInput(e: Event) {
     const input = e.target as HTMLInputElement;
     const file = input.files?.[0];
-    if (!file) return; // user cancelled — stay on start
-
-    // Don't process the image client-side — it eats too much RAM on Android.
-    // The backend resizes to 1200px via imaging.Resize, so the original is fine.
-    // We skip showing a preview to avoid decoding a huge photo in the browser.
-    setPhotoFile(file);
-
-    // Check nearby fish
-    const checkLat = useManualCoords ? parseFloat(manualLat) : lat;
-    const checkLng = useManualCoords ? parseFloat(manualLng) : lng;
-    if (checkLat && checkLng) {
-      try {
-        const nearby = await api.nearbyFish(checkLat, checkLng);
-        setNearbyFish(nearby);
-      } catch {
-        setNearbyFish([]);
-      }
-    }
-
+    if (!file) return;
+    setPhotoBlob(file);
+    setPhotoUrl(URL.createObjectURL(file));
     setStep('confirm');
   }
 
-  // ── Submit / Collect ────────────────────────────────────────────────
-  async function handleCollectExisting(fishId: number) {
-    try {
-      await api.collect(fishId);
-      setMessage('Zebrane! 🎉');
-      setStep('done');
-    } catch (err: any) {
-      alert(err.message);
-    }
-  }
-
+  // ── Submit ───────────────────────────────────────────────────────
   async function handleSubmitNew() {
     const finalLat = useManualCoords ? parseFloat(manualLat) : lat;
     const finalLng = useManualCoords ? parseFloat(manualLng) : lng;
@@ -105,7 +136,7 @@ export function SpotPage() {
       alert('Podaj lokalizację (GPS lub ręcznie)');
       return;
     }
-    if (!photoFile) {
+    if (!photoBlob) {
       alert('Najpierw zrób zdjęcie');
       return;
     }
@@ -113,7 +144,7 @@ export function SpotPage() {
     setLoading(true);
     try {
       const formData = new FormData();
-      formData.append('photo', photoFile, 'capture.jpg');
+      formData.append('photo', photoBlob, 'capture.jpg');
       formData.append('latitude', String(finalLat));
       formData.append('longitude', String(finalLng));
       formData.append('address_hint', addressHint);
@@ -128,9 +159,19 @@ export function SpotPage() {
     }
   }
 
+  async function handleCollectExisting(fishId: number) {
+    try {
+      await api.collect(fishId);
+      setMessage('Zebrane! 🎉');
+      setStep('done');
+    } catch (err: any) {
+      alert(err.message);
+    }
+  }
+
   function reset() {
     setStep('start');
-    setPhotoFile(null);
+    setPhotoBlob(null);
     setPhotoUrl('');
     setLat(0);
     setLng(0);
@@ -141,11 +182,10 @@ export function SpotPage() {
     setNearbyFish([]);
     setAddressHint('');
     setMessage('');
-    // Reset file input so picking the same file re-fires onChange
     if (fileInputRef.current) fileInputRef.current.value = '';
   }
 
-  // ── Render ──────────────────────────────────────────────────────────
+  // ── Render ───────────────────────────────────────────────────────
   if (step === 'done') {
     return (
       <div class="page">
@@ -165,7 +205,7 @@ export function SpotPage() {
         <div class="spot-start">
           <p>Zrób zdjęcie rybie w miejscu, gdzie ją znalazłeś.</p>
           <p style="font-size:13px;color:#7F8C8D;text-align:center;">
-            Otworzy się aparat — zrobisz zdjęcie i wrócisz do apki.
+            Aparat otworzy się w przeglądarce — nie wychodzisz z apki.
           </p>
 
           {gpsStatus === 'failed' && (
@@ -178,19 +218,27 @@ export function SpotPage() {
             {loading ? 'Pobieranie lokalizacji…' : 'Zrób zdjęcie! 📷'}
           </button>
 
-          {loading && <p style="text-align:center;color:#999;font-size:13px;margin-top:8px;">⏳ Przetwarzanie zdjęcia…</p>}
+          {/* Hidden file input — fallback for desktop / denied camera */}
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/*"
+            capture="environment"
+            style={{ display: 'none' }}
+            onChange={handleFileInput}
+          />
         </div>
       )}
 
-      {/* Always-mounted file input (don't unmount on step change, breaks camera return on Android) */}
-      <input
-        ref={fileInputRef}
-        type="file"
-        accept="image/*"
-        capture="environment"
-        style={{ display: 'none' }}
-        onChange={handleFileInput}
-      />
+      {step === 'photo' && (
+        <div class="camera-view">
+          <video ref={videoRef} autoplay playsinline class="camera-video" />
+          <canvas ref={canvasRef} style={{ display: 'none' }} />
+          <button class="btn btn-primary capture-btn" onClick={capturePhoto}>
+            Zrób zdjęcie! 📸
+          </button>
+        </div>
+      )}
 
       {step === 'confirm' && (
         <div class="confirm-view">
@@ -201,8 +249,6 @@ export function SpotPage() {
               onConfirm={(newLat, newLng, address) => {
                 setLat(newLat);
                 setLng(newLng);
-                setManualLat(String(newLat));
-                setManualLng(String(newLng));
                 setUseManualCoords(false);
                 setGpsStatus('ok');
                 if (address) setAddressHint(address);
@@ -212,22 +258,14 @@ export function SpotPage() {
             />
           )}
 
-          <div style={{ textAlign: 'center', padding: '16px', background: '#E8F5E9', borderRadius: '12px', marginBottom: '12px' }}>
-            <span style={{ fontSize: '32px' }}>✅</span>
-            <p style={{ fontWeight: 600, marginTop: '4px', color: '#2E7D32' }}>Zdjęcie zrobione!</p>
-            <p style={{ fontSize: '12px', color: '#666' }}>Zdjęcie zostanie przeskalowane przy wysyłaniu.</p>
-          </div>
+          <img src={photoUrl} alt="captured" class="photo-preview" />
 
-          {/* ── Coordinates section ── */}
+          {/* ── Coordinates ── */}
           {!useManualCoords && gpsStatus === 'ok' && (
             <p class="coords-display">
-              📍 {lat.toFixed(5)}, {lng.toFixed(5)}
-              {' '}
-              <a
-                href="#"
-                style={{ fontSize: '12px', color: '#4ECDC4' }}
-                onClick={(e) => { e.preventDefault(); setShowMapPicker(true); }}
-              >
+              📍 {lat.toFixed(5)}, {lng.toFixed(5)}{' '}
+              <a href="#" style={{ fontSize: '12px', color: '#4ECDC4' }}
+                onClick={(e) => { e.preventDefault(); setShowMapPicker(true); }}>
                 (zmień na mapie)
               </a>
             </p>
@@ -236,73 +274,40 @@ export function SpotPage() {
           {(useManualCoords || gpsStatus === 'failed') && (
             <div>
               <p style={{ fontSize: '13px', color: '#7F8C8D', marginBottom: '8px', textAlign: 'center' }}>
-                {gpsStatus === 'failed'
-                  ? '📍 Lokalizacja nie została pobrana automatycznie — wpisz współrzędne ręcznie:'
-                  : '📍 Edytuj współrzędne:'}
+                📍 {gpsStatus === 'failed' ? 'Lokalizacja nie pobrana — wpisz ręcznie:' : 'Edytuj współrzędne:'}
               </p>
               <div class="coords-inputs">
-                <input
-                  class="input"
-                  type="number"
-                  step="0.000001"
-                  placeholder="Szerokość (lat)"
-                  value={manualLat}
-                  onInput={(e: any) => setManualLat(e.target.value)}
-                />
-                <input
-                  class="input"
-                  type="number"
-                  step="0.000001"
-                  placeholder="Długość (lng)"
-                  value={manualLng}
-                  onInput={(e: any) => setManualLng(e.target.value)}
-                />
+                <input class="input" type="number" step="0.000001" placeholder="Szerokość (lat)"
+                  value={manualLat} onInput={(e: any) => setManualLat(e.target.value)} />
+                <input class="input" type="number" step="0.000001" placeholder="Długość (lng)"
+                  value={manualLng} onInput={(e: any) => setManualLng(e.target.value)} />
               </div>
               <div style={{ display: 'flex', gap: '8px', marginBottom: '12px' }}>
-                <button
-                  class="btn btn-secondary"
-                  style={{ flex: 1, fontSize: '14px', padding: '10px' }}
-                  onClick={() => setShowMapPicker(true)}
-                >
+                <button class="btn btn-secondary" style={{ flex: 1, fontSize: '14px', padding: '10px' }}
+                  onClick={() => setShowMapPicker(true)}>
                   🗺️ Wybierz na mapie
                 </button>
-                <button
-                  style={{ flex: 1, fontSize: '14px', padding: '10px', background: '#fff', color: '#4ECDC4', border: '2px solid #4ECDC4', borderRadius: '12px', cursor: 'pointer', fontWeight: 600 }}
+                <button style={{ flex: 1, fontSize: '14px', padding: '10px', background: '#fff', color: '#4ECDC4', border: '2px solid #4ECDC4', borderRadius: '12px', cursor: 'pointer', fontWeight: 600 }}
                   onClick={() => {
                     navigator.geolocation.getCurrentPosition(
-                      (pos) => {
-                        setLat(pos.coords.latitude);
-                        setLng(pos.coords.longitude);
-                        setManualLat(String(pos.coords.latitude));
-                        setManualLng(String(pos.coords.longitude));
-                        setUseManualCoords(false);
-                        setGpsStatus('ok');
-                      },
-                      () => alert('Nadal nie można pobrać lokalizacji'),
-                      { enableHighAccuracy: true, timeout: 10000 }
+                      (pos) => { setLat(pos.coords.latitude); setLng(pos.coords.longitude); setGpsStatus('ok'); setUseManualCoords(false); },
+                      () => alert('Nie można pobrać lokalizacji'),
+                      { enableHighAccuracy: true, timeout: 10000 },
                     );
-                  }}
-                >
+                  }}>
                   📡 GPS
                 </button>
               </div>
             </div>
           )}
 
-          {/* ── Address hint ── */}
-          <input
-            class="input"
-            type="text"
-            placeholder="Opis miejsca (opcjonalnie)"
-            value={addressHint}
-            onInput={(e: any) => setAddressHint(e.target.value)}
-          />
+          <input class="input" type="text" placeholder="Opis miejsca (opcjonalnie)"
+            value={addressHint} onInput={(e: any) => setAddressHint(e.target.value)} />
 
-          {/* ── Nearby fish ── */}
           {nearbyFish.length > 0 && (
             <div class="nearby-section">
               <h3>Czy to jedna z tych ryb?</h3>
-              {nearbyFish.map(f => (
+              {nearbyFish.map((f) => (
                 <div key={f.id} class="nearby-card" onClick={() => handleCollectExisting(f.id)}>
                   <img src={`/api/photos/${f.photo_filename}`} alt="ryba" class="nearby-thumb" />
                   <div>
@@ -315,12 +320,7 @@ export function SpotPage() {
             </div>
           )}
 
-          {/* ── Submit ── */}
-          <button
-            class="btn btn-primary"
-            onClick={handleSubmitNew}
-            disabled={loading}
-          >
+          <button class="btn btn-primary" onClick={handleSubmitNew} disabled={loading}>
             {loading ? 'Wysyłanie...' : 'Nowa ryba! 🐟'}
           </button>
         </div>
