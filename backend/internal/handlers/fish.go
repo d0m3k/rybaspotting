@@ -3,6 +3,7 @@ package handlers
 import (
 	"database/sql"
 	"fmt"
+	"log"
 	"math"
 	"net/http"
 	"os"
@@ -92,6 +93,14 @@ func (h *FishHandler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// If anything fails from here on, clean up the orphan fish row.
+	ok := false
+	defer func() {
+		if !ok {
+			h.DB.Exec(`DELETE FROM fish WHERE id = $1`, fishID)
+		}
+	}()
+
 	// Save files named by fish ID
 	ext := ".jpg"
 	if header != nil && header.Filename != "" {
@@ -131,7 +140,13 @@ func (h *FishHandler) Create(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Update photo_filename in DB
-	_, _ = h.DB.Exec(`UPDATE fish SET photo_filename = $1 WHERE id = $2`, filename, fishID)
+	if _, err := h.DB.Exec(`UPDATE fish SET photo_filename = $1 WHERE id = $2`, filename, fishID); err != nil {
+		log.Printf("[FISH] ERROR updating photo_filename for id=%d: %v", fishID, err)
+		http.Error(w, `{"error":"internal error"}`, http.StatusInternalServerError)
+		return
+	}
+
+	ok = true // everything succeeded, don't clean up
 
 	// Return created fish
 	f := models.Fish{
@@ -143,6 +158,9 @@ func (h *FishHandler) Create(w http.ResponseWriter, r *http.Request) {
 		SpottedBy:     userID,
 		CreatedAt:     time.Now(),
 	}
+	log.Printf("[FISH] type=created id=%d user_id=%d lat=%.5f lng=%.5f addr=%q",
+		f.ID, userID, lat, lng, addressHint)
+
 	writeJSON(w, http.StatusCreated, f)
 }
 
