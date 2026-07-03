@@ -61,11 +61,16 @@ export function SpotPage() {
       const stream = await navigator.mediaDevices?.getUserMedia({
         video: { facingMode: { ideal: 'environment' } },
       });
-      if (stream && videoRef.current) {
-        videoRef.current.srcObject = stream;
-        videoRef.current.muted = true;           // iOS requires muted for autoplay
-        await videoRef.current.play();
+      if (stream) {
+        // Set step first so Preact renders the <video> element,
+        // then attach the stream on the next frame.
         setStep('photo');
+        await new Promise(r => requestAnimationFrame(r));
+        if (videoRef.current) {
+          videoRef.current.srcObject = stream;
+          videoRef.current.muted = true;
+          await videoRef.current.play();
+        }
       }
     } catch {
       // Camera not available → open file picker directly
