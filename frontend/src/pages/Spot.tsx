@@ -110,11 +110,19 @@ export function SpotPage() {
     const file = input.files?.[0];
     if (!file) return; // user cancelled — stay on start
 
+    setLoading(true);
+
     // Downscale the image client-side to avoid memory issues on mobile
     // Max 1200px wide (matches backend MaxPhotoWidth for consistency)
-    const downscaled = await downscaleImage(file, 1200);
-    setPhotoFile(downscaled);
-    setPhotoUrl(URL.createObjectURL(downscaled));
+    let photo = file as Blob;
+    try {
+      photo = await downscaleImage(file, 1200);
+    } catch (err) {
+      console.warn('Downscale failed, using original:', err);
+    }
+    setPhotoFile(photo);
+    if (photoUrl) URL.revokeObjectURL(photoUrl);
+    setPhotoUrl(URL.createObjectURL(photo));
 
     // Check nearby fish
     const checkLat = useManualCoords ? parseFloat(manualLat) : lat;
@@ -128,6 +136,7 @@ export function SpotPage() {
       }
     }
 
+    setLoading(false);
     setStep('confirm');
   }
 
@@ -223,17 +232,19 @@ export function SpotPage() {
             {loading ? 'Pobieranie lokalizacji…' : 'Zrób zdjęcie! 📷'}
           </button>
 
-          {/* Native camera on mobile, file picker on desktop */}
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept="image/*"
-            capture="environment"
-            style={{ display: 'none' }}
-            onChange={handleFileInput}
-          />
+          {loading && <p style="text-align:center;color:#999;font-size:13px;margin-top:8px;">⏳ Przetwarzanie zdjęcia…</p>}
         </div>
       )}
+
+      {/* Always-mounted file input (don't unmount on step change, breaks camera return on Android) */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/*"
+        capture="environment"
+        style={{ display: 'none' }}
+        onChange={handleFileInput}
+      />
 
       {step === 'confirm' && (
         <div class="confirm-view">

@@ -71,9 +71,15 @@ export function UploadPage() {
     }
 
     // Downscale the image client-side to avoid memory issues on mobile
-    const downscaled = await downscaleImage(file, 1200);
-    setPhotoFile(downscaled);
-    setPhotoUrl(URL.createObjectURL(downscaled));
+    let photo = file as Blob;
+    try {
+      photo = await downscaleImage(file, 1200);
+    } catch (err) {
+      console.warn('Downscale failed, using original:', err);
+    }
+    setPhotoFile(photo);
+    if (photoUrl) URL.revokeObjectURL(photoUrl);
+    setPhotoUrl(URL.createObjectURL(photo));
 
     if (exifLat && exifLng) {
       setLat(exifLat);
