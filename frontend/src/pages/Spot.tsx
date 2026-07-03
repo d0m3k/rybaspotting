@@ -2,55 +2,11 @@ import { useState, useRef } from 'preact/hooks';
 import { api } from '../api';
 import { LocationPicker } from '../components/LocationPicker';
 
-// Downscale an image to a maximum width (preserves aspect ratio).
-// Returns a Blob suitable for upload — reduces memory on mobile.
-function downscaleImage(file: File, maxWidth: number): Promise<Blob> {
-  return new Promise((resolve, reject) => {
-    const img = new Image();
-    const url = URL.createObjectURL(file);
-    img.onload = () => {
-      URL.revokeObjectURL(url);
-
-      let w = img.naturalWidth;
-      let h = img.naturalHeight;
-
-      // Only downscale if wider than maxWidth
-      if (w > maxWidth) {
-        const ratio = maxWidth / w;
-        w = maxWidth;
-        h = Math.round(h * ratio);
-      }
-
-      const canvas = document.createElement('canvas');
-      canvas.width = w;
-      canvas.height = h;
-      const ctx = canvas.getContext('2d')!;
-      ctx.drawImage(img, 0, 0, w, h);
-
-      canvas.toBlob(
-        (blob) => {
-          if (blob) resolve(blob);
-          else reject(new Error('canvas.toBlob failed'));
-        },
-        'image/jpeg',
-        0.85
-      );
-    };
-    img.onerror = () => {
-      URL.revokeObjectURL(url);
-      // Fallback: return the original file if we can't decode it
-      resolve(file);
-    };
-    img.src = url;
-  });
-}
-
 type Step = 'start' | 'confirm' | 'done';
 
 export function SpotPage() {
   const [step, setStep] = useState<Step>('start');
   const [photoFile, setPhotoFile] = useState<File | null>(null);
-  const [photoUrl, setPhotoUrl] = useState<string>('');
   const [lat, setLat] = useState<number>(0);
   const [lng, setLng] = useState<number>(0);
   const [manualLat, setManualLat] = useState('');
@@ -110,19 +66,10 @@ export function SpotPage() {
     const file = input.files?.[0];
     if (!file) return; // user cancelled — stay on start
 
-    setLoading(true);
-
-    // Downscale the image client-side to avoid memory issues on mobile
-    // Max 1200px wide (matches backend MaxPhotoWidth for consistency)
-    let photo = file as Blob;
-    try {
-      photo = await downscaleImage(file, 1200);
-    } catch (err) {
-      console.warn('Downscale failed, using original:', err);
-    }
-    setPhotoFile(photo);
-    if (photoUrl) URL.revokeObjectURL(photoUrl);
-    setPhotoUrl(URL.createObjectURL(photo));
+    // Don't process the image client-side — it eats too much RAM on Android.
+    // The backend resizes to 1200px via imaging.Resize, so the original is fine.
+    // We skip showing a preview to avoid decoding a huge photo in the browser.
+    setPhotoFile(file);
 
     // Check nearby fish
     const checkLat = useManualCoords ? parseFloat(manualLat) : lat;
@@ -136,7 +83,6 @@ export function SpotPage() {
       }
     }
 
-    setLoading(false);
     setStep('confirm');
   }
 
@@ -266,7 +212,11 @@ export function SpotPage() {
             />
           )}
 
-          <img src={photoUrl} alt="captured" class="photo-preview" />
+          <div style={{ textAlign: 'center', padding: '16px', background: '#E8F5E9', borderRadius: '12px', marginBottom: '12px' }}>
+            <span style={{ fontSize: '32px' }}>✅</span>
+            <p style={{ fontWeight: 600, marginTop: '4px', color: '#2E7D32' }}>Zdjęcie zrobione!</p>
+            <p style={{ fontSize: '12px', color: '#666' }}>Zdjęcie zostanie przeskalowane przy wysyłaniu.</p>
+          </div>
 
           {/* ── Coordinates section ── */}
           {!useManualCoords && gpsStatus === 'ok' && (
