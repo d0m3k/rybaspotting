@@ -37,6 +37,9 @@ export function NavBar({ current, onNavigate, allowUpload, isAdmin }: NavBarProp
           <span class="nav-label">{tab.label}</span>
         </button>
       ))}
+      <div style="position:absolute;top:-12px;right:4px;font-size:9px;color:#ccc;background:#FFF8F0;padding:0 3px;border-radius:3px;">
+        {__BUILD_HASH__}
+      </div>
     </nav>
   );
 }

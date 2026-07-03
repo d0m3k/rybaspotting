@@ -1,8 +1,17 @@
+import { execSync } from 'child_process';
 import { defineConfig } from 'vite';
 import preact from '@preact/preset-vite';
 import { VitePWA } from 'vite-plugin-pwa';
 
+// Build hash: GITHUB_SHA in CI, git rev-parse locally
+const BUILD_HASH = (process.env.GITHUB_SHA?.slice(0, 7))
+  || execSync('git rev-parse --short HEAD', { encoding: 'utf-8' }).trim()
+  || 'dev';
+
 export default defineConfig({
+  define: {
+    __BUILD_HASH__: JSON.stringify(BUILD_HASH),
+  },
   plugins: [
     preact(),
     VitePWA({
