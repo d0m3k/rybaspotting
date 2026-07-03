@@ -39,11 +39,13 @@ fi
 echo "=== Copying backend binary ==="
 if [ -n "$HOST" ]; then
   scp -P "$PORT" "$TMPDIR/rybaspotting" "$HOST:/opt/rybaspotting/"
-  scp -P "$PORT" -r "$TMPDIR/frontend" "$HOST:/opt/rybaspotting/"
+  ssh -p "$PORT" "$HOST" "mkdir -p /opt/rybaspotting/frontend/dist && rm -rf /opt/rybaspotting/frontend/dist"
+  scp -P "$PORT" -r "$TMPDIR/frontend/dist" "$HOST:/opt/rybaspotting/frontend/"
 else
+  mkdir -p /opt/rybaspotting/frontend/dist
   cp "$TMPDIR/rybaspotting" /opt/rybaspotting/
-  rm -rf /opt/rybaspotting/frontend
-  cp -r "$TMPDIR/frontend" /opt/rybaspotting/
+  rm -rf /opt/rybaspotting/frontend/dist
+  cp -r "$TMPDIR/frontend/dist" /opt/rybaspotting/frontend/
 fi
 
 echo "=== Starting service ==="
