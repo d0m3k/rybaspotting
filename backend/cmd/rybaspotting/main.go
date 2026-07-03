@@ -113,6 +113,8 @@ func main() {
 				r.Post("/admin/promote", adminH.PromoteUser)
 				r.Post("/admin/toggle-upload-mode", adminH.ToggleGalleryUpload)
 				r.Get("/admin/stats", adminH.Stats)
+				r.Get("/admin/fish", adminH.ListAllFish)
+				r.Delete("/admin/fish/{id}", adminH.DeleteFish)
 			})
 		})
 	})

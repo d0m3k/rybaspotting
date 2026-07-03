@@ -99,6 +99,14 @@ export const api = {
       method: 'POST',
     }),
 
+  // Admin — list all fish
+  listAllFish: () =>
+    request<any[]>('/api/admin/fish'),
+
+  // Admin — delete a fish (hard delete)
+  deleteFish: (id: number) =>
+    request(`/api/admin/fish/${id}`, { method: 'DELETE' }),
+
   // Leaderboard
   leaderboard: () =>
     request<{ top_spotters: { username: string; count: number }[]; top_collectors: { username: string; count: number }[] }>(

@@ -1,6 +1,17 @@
 import { useState, useEffect } from 'preact/hooks';
 import { api } from '../api';
 
+interface FishEntry {
+  id: number;
+  photo_filename: string;
+  latitude: number;
+  longitude: number;
+  address_hint: string;
+  spotted_by: number;
+  spotter_name: string;
+  created_at: string;
+}
+
 export function AdminStatsPage() {
   const [stats, setStats] = useState<{
     user_count: number;
@@ -8,6 +19,7 @@ export function AdminStatsPage() {
     photo_count: number;
     photo_size_mb: number;
   } | null>(null);
+  const [fishList, setFishList] = useState<FishEntry[]>([]);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
 
@@ -17,17 +29,25 @@ export function AdminStatsPage() {
   const [promoteErr, setPromoteErr] = useState('');
   const [promoting, setPromoting] = useState(false);
 
-  useEffect(() => { loadStats(); }, []);
+  // Delete state
+  const [deleting, setDeleting] = useState<number | null>(null);
 
-  async function loadStats() {
+  useEffect(() => { loadData(); }, []);
+
+  async function loadData() {
     setLoading(true);
     setError('');
     try {
-      const s = await api.getAdminStats();
+      const [s, fish] = await Promise.all([
+        api.getAdminStats(),
+        api.listAllFish(),
+      ]);
       setStats(s);
+      setFishList(fish);
     } catch (err: any) {
       setError(err.message);
       setStats(null);
+      setFishList([]);
     } finally {
       setLoading(false);
     }
@@ -44,11 +64,25 @@ export function AdminStatsPage() {
       const res: any = await api.promoteUser(name);
       setPromoteMsg(res.message || 'Promoted!');
       setPromoteUser('');
-      loadStats(); // refresh counts
+      loadData();
     } catch (err: any) {
       setPromoteErr(err.message);
     } finally {
       setPromoting(false);
+    }
+  }
+
+  async function handleDelete(fishId: number) {
+    if (!confirm(`Usunąć rybę #${fishId}? Zdjęcie i dane zostaną trwale usunięte.`)) return;
+    setDeleting(fishId);
+    try {
+      await api.deleteFish(fishId);
+      setFishList(prev => prev.filter(f => f.id !== fishId));
+      if (stats) setStats({ ...stats, fish_count: stats.fish_count - 1 });
+    } catch (err: any) {
+      alert('Błąd: ' + err.message);
+    } finally {
+      setDeleting(null);
     }
   }
 
@@ -93,6 +127,7 @@ export function AdminStatsPage() {
         </div>
       )}
 
+      {/* Promote user */}
       <div style="margin-top:24px;padding:16px;background:#fff;border-radius:14px;border:1px solid #F0E0D0;">
         <h3 style="margin-bottom:8px;">👑 Promuj użytkownika na admina</h3>
         <form onSubmit={handlePromote} style="display:flex;gap:8px;">
@@ -111,6 +146,70 @@ export function AdminStatsPage() {
         </form>
         {promoteErr && <p class="error-msg" style="margin-top:8px;">{promoteErr}</p>}
         {promoteMsg && <p class="success-msg" style="margin-top:8px;">{promoteMsg}</p>}
+      </div>
+
+      {/* All fish */}
+      <div style="margin-top:24px;">
+        <h3>🐟 Wszystkie ryby ({fishList.length})</h3>
+
+        {fishList.length === 0 ? (
+          <p style="text-align:center;color:#999;padding:24px;">Brak ryb do wyświetlenia.</p>
+        ) : (
+          <div style="display:flex;flex-direction:column;gap:12px;">
+            {fishList.map(fish => (
+              <div
+                key={fish.id}
+                style="background:#fff;border-radius:14px;border:1px solid #F0E0D0;overflow:hidden;display:flex;flex-direction:column;"
+              >
+                {/* Photo */}
+                <div style="width:100%;aspect-ratio:4/3;background:#f5e8d8;overflow:hidden;">
+                  {fish.photo_filename ? (
+                    <img
+                      src={`/api/photos/${fish.photo_filename}`}
+                      alt={`Ryba #${fish.id}`}
+                      style="width:100%;height:100%;object-fit:cover;"
+                      loading="lazy"
+                    />
+                  ) : (
+                    <div style="display:flex;align-items:center;justify-content:center;height:100%;color:#ccc;">
+                      Brak zdjęcia
+                    </div>
+                  )}
+                </div>
+
+                {/* Info */}
+                <div style="padding:12px;">
+                  <div style="display:flex;justify-content:space-between;align-items:start;">
+                    <div>
+                      <strong>#{fish.id}</strong>
+                      {' '}
+                      <span style="color:#E67E22;">{fish.spotter_name}</span>
+                    </div>
+                    <button
+                      class="btn"
+                      style="background:#E74C3C;color:#fff;padding:6px 14px;font-size:12px;border:none;border-radius:8px;cursor:pointer;opacity:1;min-width:auto;"
+                      onClick={() => handleDelete(fish.id)}
+                      disabled={deleting === fish.id}
+                    >
+                      {deleting === fish.id ? '…' : '🗑 Usuń'}
+                    </button>
+                  </div>
+                  <div style="font-size:12px;color:#999;margin-top:6px;">
+                    {fish.address_hint && <div>📍 {fish.address_hint}</div>}
+                    <div>
+                      {fish.latitude.toFixed(5)}, {fish.longitude.toFixed(5)}
+                      {' · '}
+                      {new Date(fish.created_at).toLocaleDateString('pl-PL', {
+                        day: 'numeric', month: 'short', year: 'numeric',
+                        hour: '2-digit', minute: '2-digit',
+                      })}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );
