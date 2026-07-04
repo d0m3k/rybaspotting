@@ -151,9 +151,9 @@ func corsMiddleware(next http.Handler) http.Handler {
 // noCacheMiddleware prevents browsers and service workers from caching API responses.
 func noCacheMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Cache-Control", "no-cache, no-store, must-revalidate")
+		// no-cache = always validate; ETag/304 works. No must-revalidate/no-store.
+		w.Header().Set("Cache-Control", "no-cache")
 		w.Header().Set("Pragma", "no-cache")
-		w.Header().Set("Expires", "0")
 		next.ServeHTTP(w, r)
 	})
 }
