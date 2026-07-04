@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'preact/hooks';
+import { useState, useEffect, useCallback } from 'preact/hooks';
 import { loadAuth, clearAuth, saveAuth, AuthState } from './stores/auth';
 import { api } from './api';
 import { LoginPage } from './pages/Login';
@@ -24,6 +24,13 @@ export function App() {
   const [page, setPage] = useState<Page>(auth ? 'map' : 'login');
   const [allowUpload, setAllowUpload] = useState(false);
   const [stats, setStats] = useState<UserStats | null>(null);
+  const [hideNav, setHideNav] = useState(false);
+
+  const refreshStats = useCallback(() => {
+    api.getMyStats()
+      .then(s => setStats({ spotted: s.spotted, collected: s.collected, display_name: s.display_name }))
+      .catch(() => {});
+  }, []);
 
   useEffect(() => {
     // Fetch config for gallery upload toggle
@@ -32,16 +39,12 @@ export function App() {
         .then(r => r.json())
         .then(c => setAllowUpload(c.allow_gallery_upload))
         .catch(() => {});
-      // Fetch user stats for the top-bar widget
-      api.getMyStats()
-        .then(s => setStats({ spotted: s.spotted, collected: s.collected, display_name: s.display_name }))
-        .catch(() => {});
+      refreshStats();
     }
-  }, [auth]);
+  }, [auth, refreshStats]);
 
   function handleLogin(state: AuthState) {
     saveAuth(state);
-    // Also set the raw token for the api module
     localStorage.setItem('token', state.token);
     setAuth(state);
     setPage('map');
@@ -55,11 +58,9 @@ export function App() {
   }
 
   function navigate(p: Page) {
+    setHideNav(false);
     if (p === 'profile') {
-      // Refresh stats when navigating to profile
-      api.getMyStats()
-        .then(s => setStats({ spotted: s.spotted, collected: s.collected, display_name: s.display_name }))
-        .catch(() => {});
+      refreshStats();
     }
     setPage(p);
   }
@@ -75,32 +76,34 @@ export function App() {
 
   return (
     <div class="app-container">
-      {/* Top bar with profile widget */}
-      <header class="top-bar">
-        <div class="top-bar-brand">🐟 Ryby z Dupom</div>
-        <button class="profile-widget" onClick={() => navigate('profile')}>
-          <span class="profile-widget-name">{displayName}</span>
-          {stats && (
-            <span class="profile-widget-stats">
-              <span class="stat-badge stat-spotted">S {stats.spotted}</span>
-              <span class="stat-badge stat-collected">C {stats.collected}</span>
+      {/* Top bar with profile widget — hidden when nav is hidden (spot confirm mode) */}
+      {!hideNav && (
+        <header class="top-bar">
+          <div class="top-bar-brand">🐟 Ryby z Dupom</div>
+          <button class="profile-widget" onClick={() => navigate('profile')}>
+            <span class="profile-widget-name">{displayName}</span>
+            {stats && (
+              <span class="profile-widget-stats">
+                <span class="stat-badge stat-spotted">S {stats.spotted}</span>
+                <span class="stat-badge stat-collected">C {stats.collected}</span>
+              </span>
+            )}
+            <span class="profile-widget-avatar">
+              {(displayName || '?').charAt(0).toUpperCase()}
             </span>
-          )}
-          <span class="profile-widget-avatar">
-            {(displayName || '?').charAt(0).toUpperCase()}
-          </span>
-        </button>
-      </header>
+          </button>
+        </header>
+      )}
 
       <div class="app-content">
-        {page === 'map' && <MapPage />}
-        {page === 'spot' && <SpotPage />}
-        {page === 'upload' && allowUpload && <UploadPage />}
+        {page === 'map' && <MapPage onStatsChanged={refreshStats} />}
+        {page === 'spot' && <SpotPage onHideNav={setHideNav} onStatsChanged={refreshStats} />}
+        {page === 'upload' && allowUpload && <UploadPage onStatsChanged={refreshStats} />}
         {page === 'leaderboard' && <LeaderboardPage />}
         {page === 'profile' && <ProfilePage auth={auth} onLogout={handleLogout} />}
         {page === 'admin' && <AdminStatsPage />}
       </div>
-      <NavBar current={page} onNavigate={navigate} allowUpload={allowUpload} isAdmin={auth?.isAdmin ?? false} />
+      {!hideNav && <NavBar current={page} onNavigate={navigate} allowUpload={allowUpload} isAdmin={auth?.isAdmin ?? false} />}
     </div>
   );
 }

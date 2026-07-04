@@ -5,7 +5,7 @@ import { LocationPicker } from '../components/LocationPicker';
 // Lazy import exifr
 let exifr: any = null;
 
-export function UploadPage() {
+export function UploadPage({ onStatsChanged }: { onStatsChanged?: () => void }) {
   const [photoFile, setPhotoFile] = useState<File | null>(null);
   const [photoUrl, setPhotoUrl] = useState<string>('');
   const [lat, setLat] = useState<number>(0);
@@ -103,6 +103,7 @@ export function UploadPage() {
     try {
       await api.collect(fishId);
       setMessage('Zebrane! 🎉');
+      if (onStatsChanged) onStatsChanged();
     } catch (err: any) {
       alert(err.message);
     }
@@ -129,6 +130,7 @@ export function UploadPage() {
 
       await api.createFish(formData, false);
       setMessage('Nowa ryba dodana! 🐟✨');
+      if (onStatsChanged) onStatsChanged();
     } catch (err: any) {
       alert(err.message);
     } finally {

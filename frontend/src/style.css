@@ -474,6 +474,39 @@ html, body {
   background: #000;
 }
 
+.camera-viewfinder {
+  position: relative;
+  width: 100%;
+}
+
+.camera-crop-overlay {
+  position: absolute;
+  inset: 0;
+  border-radius: 14px;
+  pointer-events: none;
+  z-index: 2;
+  box-shadow: inset 0 0 0 9999px rgba(0,0,0,0.25);
+}
+
+.camera-flip-btn {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  background: rgba(0, 0, 0, 0.6);
+  color: #fff;
+  border: none;
+  border-radius: 50%;
+  width: 40px;
+  height: 40px;
+  font-size: 18px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  backdrop-filter: blur(4px);
+  z-index: 10;
+}
+
 .capture-btn {
   margin-top: 8px;
 }

@@ -5,7 +5,12 @@ import { LocationPreview } from '../components/LocationPreview';
 
 type Step = 'start' | 'confirm' | 'done';
 
-export function SpotPage() {
+interface Props {
+  onHideNav?: (hide: boolean) => void;
+  onStatsChanged?: () => void;
+}
+
+export function SpotPage({ onHideNav, onStatsChanged }: Props) {
   const [step, setStep] = useState<Step>('start');
   const [photoBlob, setPhotoBlob] = useState<Blob | null>(null);
   const [photoUrl, setPhotoUrl] = useState<string>('');
@@ -30,6 +35,16 @@ export function SpotPage() {
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
 
+  // ── Hide nav bar when in confirm step ─────────────────────────────
+  useEffect(() => {
+    if (onHideNav) {
+      onHideNav(step === 'confirm');
+    }
+    return () => {
+      if (onHideNav) onHideNav(false);
+    };
+  }, [step, onHideNav]);
+
   // ── Geolocation ───────────────────────────────────────────────────
   async function getLocation(): Promise<{ lat: number; lng: number } | null> {
     try {
@@ -48,7 +63,6 @@ export function SpotPage() {
 
   // ── Camera management ─────────────────────────────────────────────
   async function startCamera(mode: 'environment' | 'user') {
-    // Stop any existing stream
     if (streamRef.current) {
       streamRef.current.getTracks().forEach((track) => track.stop());
       streamRef.current = null;
@@ -60,7 +74,7 @@ export function SpotPage() {
         video: {
           facingMode: mode,
           width: { ideal: 1280 },
-          height: { ideal: 720 },
+          height: { ideal: 1280 },
         },
         audio: false,
       };
@@ -70,11 +84,10 @@ export function SpotPage() {
       setHasCamera(true);
     } catch (err) {
       console.error('Failed to get camera with mode', mode, err);
-      // Fallback: try default camera without facingMode constraint
       if (mode === 'environment') {
         try {
           const fallbackStream = await navigator.mediaDevices.getUserMedia({
-            video: true,
+            video: { width: { ideal: 1280 }, height: { ideal: 1280 } },
             audio: false,
           });
           setStream(fallbackStream);
@@ -105,7 +118,6 @@ export function SpotPage() {
 
   // Initialize camera and location on mount
   useEffect(() => {
-    // Start getting location immediately
     setGpsStatus('loading');
     getLocation().then((loc) => {
       if (loc) {
@@ -120,57 +132,44 @@ export function SpotPage() {
       }
     });
 
-    // Start camera stream
     startCamera(facingMode);
 
     return () => {
-      // Clean up camera stream on unmount
       if (streamRef.current) {
         streamRef.current.getTracks().forEach((track) => track.stop());
       }
     };
   }, []);
 
-  // Update srcObject on video ref when stream changes or step returns to start
+  // Update srcObject on video ref
   useEffect(() => {
     if (videoRef.current && stream) {
       videoRef.current.srcObject = stream;
     }
   }, [stream, step]);
 
-  // ── Capture from inline camera ────────────────────────────────────
+  // ── Capture from inline camera (cropped to square) ────────────────
   function capturePhoto() {
     if (!videoRef.current) return;
     setLoading(true);
 
     const video = videoRef.current;
+    const vw = video.videoWidth;
+    const vh = video.videoHeight;
+    const size = Math.min(vw, vh);
+    const sx = (vw - size) / 2;
+    const sy = (vh - size) / 2;
+
     const canvas = document.createElement('canvas');
     const ctx = canvas.getContext('2d');
-    if (!ctx) {
-      setLoading(false);
-      return;
-    }
+    if (!ctx) { setLoading(false); return; }
 
-    const videoWidth = video.videoWidth;
-    const videoHeight = video.videoHeight;
-
-    // Scale down image to max 1200px width/height (matches backend MaxPhotoWidth)
+    // Output square, scale to fit within 1200px
     const maxDim = 1200;
-    let targetWidth = videoWidth;
-    let targetHeight = videoHeight;
-    if (videoWidth > maxDim || videoHeight > maxDim) {
-      if (videoWidth > videoHeight) {
-        targetWidth = maxDim;
-        targetHeight = Math.round((videoHeight / videoWidth) * maxDim);
-      } else {
-        targetHeight = maxDim;
-        targetWidth = Math.round((videoWidth / videoHeight) * maxDim);
-      }
-    }
-
-    canvas.width = targetWidth;
-    canvas.height = targetHeight;
-    ctx.drawImage(video, 0, 0, targetWidth, targetHeight);
+    const outSize = Math.min(size, maxDim);
+    canvas.width = outSize;
+    canvas.height = outSize;
+    ctx.drawImage(video, sx, sy, size, size, 0, 0, outSize, outSize);
 
     canvas.toBlob(
       (blob) => {
@@ -179,10 +178,8 @@ export function SpotPage() {
           if (photoUrl) URL.revokeObjectURL(photoUrl);
           setPhotoUrl(URL.createObjectURL(blob));
 
-          // Stop camera stream to release hardware
           stopCamera();
 
-          // Check nearby fish
           const checkLat = useManualCoords ? parseFloat(manualLat) : lat;
           const checkLng = useManualCoords ? parseFloat(manualLng) : lng;
           if (checkLat && checkLng) {
@@ -200,7 +197,7 @@ export function SpotPage() {
     );
   }
 
-  // ── File selected (gallery fallback) ──────────────────────────────
+  // ── File selected (gallery fallback) — also crop to square ────────
   async function handleFileInput(e: Event) {
     const input = e.target as HTMLInputElement;
     const file = input.files?.[0];
@@ -220,21 +217,15 @@ export function SpotPage() {
       const canvas = document.createElement('canvas');
       const ctx = canvas.getContext('2d');
       if (ctx) {
+        const size = Math.min(img.width, img.height);
+        const sx = (img.width - size) / 2;
+        const sy = (img.height - size) / 2;
         const maxDim = 1200;
-        let w = img.width;
-        let h = img.height;
-        if (w > maxDim || h > maxDim) {
-          if (w > h) {
-            h = Math.round((h / w) * maxDim);
-            w = maxDim;
-          } else {
-            w = Math.round((w / h) * maxDim);
-            h = maxDim;
-          }
-        }
-        canvas.width = w;
-        canvas.height = h;
-        ctx.drawImage(img, 0, 0, w, h);
+        const outSize = Math.min(size, maxDim);
+
+        canvas.width = outSize;
+        canvas.height = outSize;
+        ctx.drawImage(img, sx, sy, size, size, 0, 0, outSize, outSize);
 
         canvas.toBlob(
           (blob) => {
@@ -244,7 +235,6 @@ export function SpotPage() {
               if (photoUrl) URL.revokeObjectURL(photoUrl);
               setPhotoUrl(URL.createObjectURL(blob));
 
-              // Check nearby fish
               const checkLat = useManualCoords ? parseFloat(manualLat) : lat;
               const checkLng = useManualCoords ? parseFloat(manualLng) : lng;
               if (checkLat && checkLng) {
@@ -302,6 +292,7 @@ export function SpotPage() {
 
       await api.createFish(formData, true);
       setMessage('Nowa ryba spotted! 🐟✨');
+      if (onStatsChanged) onStatsChanged();
       setStep('done');
     } catch (err: any) {
       alert(err.message);
@@ -314,6 +305,7 @@ export function SpotPage() {
     try {
       await api.collect(fishId);
       setMessage('Zebrane! 🎉');
+      if (onStatsChanged) onStatsChanged();
       setStep('done');
     } catch (err: any) {
       alert(err.message);
@@ -336,7 +328,6 @@ export function SpotPage() {
     setMessage('');
     if (fileInputRef.current) fileInputRef.current.value = '';
 
-    // Restart geolocation
     setGpsStatus('loading');
     getLocation().then((loc) => {
       if (loc) {
@@ -351,7 +342,6 @@ export function SpotPage() {
       }
     });
 
-    // Restart camera
     startCamera(facingMode);
   }
 
@@ -381,36 +371,21 @@ export function SpotPage() {
 
           {hasCamera === true && (
             <div class="camera-view">
-              <div style={{ position: 'relative', width: '100%' }}>
+              <div class="camera-viewfinder">
                 <video
                   ref={videoRef}
                   autoPlay
                   playsInline
                   muted
                   class="camera-video"
-                  style={{ width: '100%', maxHeight: '45vh', objectFit: 'cover', borderRadius: '14px', background: '#000', display: 'block' }}
+                  style={{ width: '100%', aspectRatio: '1/1', objectFit: 'cover', borderRadius: '14px', background: '#000', display: 'block' }}
                 />
+                {/* Square crop guide overlay */}
+                <div class="camera-crop-overlay"></div>
                 <button
                   type="button"
                   onClick={toggleCamera}
-                  style={{
-                    position: 'absolute',
-                    top: '12px',
-                    right: '12px',
-                    background: 'rgba(0, 0, 0, 0.6)',
-                    color: '#fff',
-                    border: 'none',
-                    borderRadius: '50%',
-                    width: '40px',
-                    height: '40px',
-                    fontSize: '18px',
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    backdropFilter: 'blur(4px)',
-                    zIndex: 10
-                  }}
+                  class="camera-flip-btn"
                   title="Przełącz aparat"
                 >
                   🔄
@@ -551,7 +526,7 @@ export function SpotPage() {
           )}
 
           <button class="btn btn-primary" onClick={handleSubmitNew} disabled={loading}>
-            {loading ? 'Wysyłanie...' : 'Nowa ryba! 🐟'}
+            {loading ? 'Wysyłanie...' : 'Dodaj rybę! 🐟'}
           </button>
 
           <button

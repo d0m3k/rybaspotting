@@ -38,7 +38,7 @@ const fishIcon = L.divIcon({
   popupAnchor: [0, -40],
 });
 
-export function MapPage() {
+export function MapPage({ onStatsChanged }: { onStatsChanged?: () => void }) {
   const mapRef = useRef<L.Map | null>(null);
   const markersRef = useRef<L.Marker[]>([]);
   const [fishList, setFishList] = useState<any[]>([]);
@@ -108,6 +108,7 @@ export function MapPage() {
 
     try {
       await api.collect(fishId);
+      if (onStatsChanged) onStatsChanged();
       alert('Zebrane! 🐟');
     } catch (err: any) {
       alert(err.message);
