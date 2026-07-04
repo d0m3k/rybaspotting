@@ -38,7 +38,7 @@ const fishIcon = L.divIcon({
   popupAnchor: [0, -40],
 });
 
-export function MapPage({ onStatsChanged }: { onStatsChanged?: () => void }) {
+export function MapPage({ onStatsChanged, userId }: { onStatsChanged?: () => void; userId?: number }) {
   const mapRef = useRef<L.Map | null>(null);
   const markersRef = useRef<L.Marker[]>([]);
   const [fishList, setFishList] = useState<any[]>([]);
@@ -120,7 +120,22 @@ export function MapPage({ onStatsChanged }: { onStatsChanged?: () => void }) {
       <div id="map" class="map-container"></div>
       {loading && <div class="map-loading">Ładowanie...</div>}
 
-      {selectedFish && (
+      {selectedFish && (() => {
+        const isOwnFish = userId != null && selectedFish.spotted_by === userId;
+        const alreadyCollected = fishDetail?.collectors?.some((c: any) => c.username === fishDetail?.spotter_name) === false
+          ? false
+          : fishDetail?.collectors?.some((c: any) => {
+              // Check if current user is in collectors by username or ID
+              return false; // We need to check by userId, but detail only has usernames
+            });
+        // Simpler: check if the current user's name appears in collectors
+        const currentUsername = localStorage.getItem('rybaspotting_auth');
+        let username = '';
+        try { username = JSON.parse(currentUsername || '{}').username || ''; } catch {}
+        const hasCollected = fishDetail?.collectors?.some((c: any) => c.username === username);
+        const canCollect = !isOwnFish && !hasCollected && !detailLoading;
+
+        return (
         <div class="bottom-sheet">
           <button class="close-btn" onClick={() => { setSelectedFish(null); setFishDetail(null); }}>✕</button>
           <img
@@ -148,14 +163,23 @@ export function MapPage({ onStatsChanged }: { onStatsChanged?: () => void }) {
               '🎣 Brak zbieraczy'
             )}
           </p>
-          <button
-            class="btn btn-primary"
-            onClick={() => handleCollect(selectedFish.id)}
-          >
-            Collect! 🎣
-          </button>
+          {isOwnFish && (
+            <p class="fish-note">📸 To Twoja ryba — jesteś jej spotterem!</p>
+          )}
+          {hasCollected && (
+            <p class="fish-note">✅ Już zebrałeś tę rybę</p>
+          )}
+          {canCollect && (
+            <button
+              class="btn btn-primary"
+              onClick={() => handleCollect(selectedFish.id)}
+            >
+              Collect! 🎣
+            </button>
+          )}
         </div>
-      )}
+        );
+      })()}
     </div>
   );
 }

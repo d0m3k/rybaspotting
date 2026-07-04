@@ -394,6 +394,7 @@ html, body {
   background: #fff;
   border-radius: 20px 20px 0 0;
   padding: 20px 16px;
+  padding-bottom: 90px;
   box-shadow: 0 -4px 24px rgba(0,0,0,0.12);
   z-index: 1000;
   max-height: 55vh;
@@ -453,6 +454,17 @@ html, body {
   color: #4ECDC4;
   margin-bottom: 10px;
   font-weight: 500;
+}
+
+.fish-note {
+  font-size: 13px;
+  color: #7F8C8D;
+  margin-bottom: 8px;
+  padding: 8px 12px;
+  background: #F5F5F5;
+  border-radius: 8px;
+  text-align: center;
+  font-style: italic;
 }
 
 /* === Spot / Upload === */

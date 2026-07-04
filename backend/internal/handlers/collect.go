@@ -32,11 +32,15 @@ func (h *CollectHandler) Collect(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Can't collect your own spot (optional rule, but let's allow it for now)
-	// Actually the requirement says "joining the list of people that met this ryba later"
-	// so the spotter can also collect? Let's allow it.
+	// Can't collect your own spot
+	var spottedBy int
+	h.DB.QueryRow(`SELECT spotted_by FROM fish WHERE id = $1`, fishID).Scan(&spottedBy)
+	if spottedBy == userID {
+		http.Error(w, `{"error":"nie możesz zebrać własnej ryby"}`, http.StatusForbidden)
+		return
+	}
 
-	_, err = h.DB.Exec(
+	result, err := h.DB.Exec(
 		`INSERT INTO collections (fish_id, user_id) VALUES ($1, $2) ON CONFLICT (fish_id, user_id) DO NOTHING`,
 		fishID, userID,
 	)
@@ -45,12 +49,10 @@ func (h *CollectHandler) Collect(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Check if already existed
-	var count int
-	h.DB.QueryRow(`SELECT COUNT(*) FROM collections WHERE fish_id = $1 AND user_id = $2`, fishID, userID).Scan(&count)
-
-	if count == 0 {
-		http.Error(w, `{"error":"already collected"}`, http.StatusConflict)
+	// Check if row already existed (ON CONFLICT DO NOTHING = 0 rows affected)
+	rowsAffected, _ := result.RowsAffected()
+	if rowsAffected == 0 {
+		http.Error(w, `{"error":"już zebrałeś tę rybę"}`, http.StatusConflict)
 		return
 	}
 

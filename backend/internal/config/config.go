@@ -26,7 +26,7 @@ func Load() *Config {
 		JWTSecret:          getEnv("JWT_SECRET", "change-me-secret"),
 		ListenAddr:         getEnv("LISTEN_ADDR", "127.0.0.1:8080"),
 		PhotoDir:           getEnv("PHOTO_DIR", "/var/lib/rybaspotting/photos"),
-		NearbyRadiusMeters: getEnvFloat("NEARBY_RADIUS_METERS", 30),
+		NearbyRadiusMeters: getEnvFloat("NEARBY_RADIUS_METERS", 50),
 		MaxPhotoWidth:      getEnvInt("MAX_PHOTO_WIDTH", 1200),
 		allowGalleryUpload: getEnvBool("ALLOW_GALLERY_UPLOAD", false),
 	}

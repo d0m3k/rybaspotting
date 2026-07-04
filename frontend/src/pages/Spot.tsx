@@ -317,6 +317,8 @@ export function SpotPage({ onHideNav, onStatsChanged }: Props) {
   }
 
   async function handleCollectExisting(fishId: number) {
+    const ok = window.confirm('Czy na pewno jesteś na miejscu i chcesz zebrać tę rybę? 🎣');
+    if (!ok) return;
     try {
       await api.collect(fishId);
       setMessage('Zebrane! 🎉');
