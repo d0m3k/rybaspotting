@@ -177,7 +177,7 @@ func (h *FishHandler) List(w http.ResponseWriter, r *http.Request) {
 
 	rows, err := h.DB.Query(
 		`SELECT f.id, f.photo_filename, f.latitude, f.longitude, f.address_hint,
-		        f.spotted_by, u.username, f.created_at
+		        f.spotted_by, COALESCE(NULLIF(u.display_name, ''), u.username), f.created_at
 		 FROM fish f
 		 JOIN users u ON u.id = f.spotted_by
 		 ORDER BY f.created_at DESC
@@ -221,7 +221,7 @@ func (h *FishHandler) Get(w http.ResponseWriter, r *http.Request) {
 	var f models.Fish
 	err = h.DB.QueryRow(
 		`SELECT f.id, f.photo_filename, f.latitude, f.longitude, f.address_hint,
-		        f.spotted_by, u.username, f.created_at
+		        f.spotted_by, COALESCE(NULLIF(u.display_name, ''), u.username), f.created_at
 		 FROM fish f
 		 JOIN users u ON u.id = f.spotted_by
 		 WHERE f.id = $1`, id,
@@ -238,7 +238,7 @@ func (h *FishHandler) Get(w http.ResponseWriter, r *http.Request) {
 
 	// Get collectors
 	rows, err := h.DB.Query(
-		`SELECT u.username, c.created_at FROM collections c
+		`SELECT COALESCE(NULLIF(u.display_name, ''), u.username), c.created_at FROM collections c
 		 JOIN users u ON u.id = c.user_id
 		 WHERE c.fish_id = $1
 		 ORDER BY c.created_at ASC`, id,
@@ -288,7 +288,7 @@ func (h *FishHandler) Nearby(w http.ResponseWriter, r *http.Request) {
 	// Bounding box pre-filter for performance, then haversine in SQL
 	rows, err := h.DB.Query(
 		`SELECT f.id, f.photo_filename, f.latitude, f.longitude, f.address_hint,
-		        f.spotted_by, u.username, f.created_at,
+		        f.spotted_by, COALESCE(NULLIF(u.display_name, ''), u.username), f.created_at,
 		        2 * 6371000 * asin(sqrt(
 		          pow(sin(radians(f.latitude  - $1) / 2), 2)
 		        + cos(radians($1)) * cos(radians(f.latitude)) * pow(sin(radians(f.longitude - $2) / 2), 2)

@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"database/sql"
+	"encoding/json"
 	"fmt"
 	"log"
 	"net/http"
@@ -85,7 +86,7 @@ func (h *UserHandler) MyCollections(w http.ResponseWriter, r *http.Request) {
 
 	rows, err := h.DB.Query(
 		`SELECT f.id, f.photo_filename, f.latitude, f.longitude, f.address_hint,
-		        u.username, f.created_at, c.created_at
+		        COALESCE(NULLIF(u.display_name, ''), u.username), f.created_at, c.created_at
 		 FROM collections c
 		 JOIN fish f ON f.id = c.fish_id
 		 JOIN users u ON u.id = f.spotted_by
@@ -160,6 +161,38 @@ func (h *UserHandler) UploadAvatar(w http.ResponseWriter, r *http.Request) {
 
 	log.Printf("[USER] type=avatar_upload user_id=%d", userID)
 	writeJSON(w, http.StatusOK, map[string]string{"message": "avatar uploaded"})
+}
+
+// UpdateDisplayName updates the user's display name.
+func (h *UserHandler) UpdateDisplayName(w http.ResponseWriter, r *http.Request) {
+	userID, _ := r.Context().Value(middleware.ContextUserID).(int)
+
+	var req struct {
+		DisplayName string `json:"display_name"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, `{"error":"invalid request body"}`, http.StatusBadRequest)
+		return
+	}
+
+	req.DisplayName = strings.TrimSpace(req.DisplayName)
+	if req.DisplayName == "" {
+		http.Error(w, `{"error":"display name cannot be empty"}`, http.StatusBadRequest)
+		return
+	}
+	if len(req.DisplayName) > 50 {
+		http.Error(w, `{"error":"display name too long (max 50)"}`, http.StatusBadRequest)
+		return
+	}
+
+	_, err := h.DB.Exec(`UPDATE users SET display_name = $1 WHERE id = $2`, req.DisplayName, userID)
+	if err != nil {
+		http.Error(w, `{"error":"internal error"}`, http.StatusInternalServerError)
+		return
+	}
+
+	log.Printf("[USER] type=update_display_name user_id=%d name=%q", userID, req.DisplayName)
+	writeJSON(w, http.StatusOK, map[string]string{"message": "display name updated", "display_name": req.DisplayName})
 }
 
 // ServeAvatar serves a user's profile picture by user ID.

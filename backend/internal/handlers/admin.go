@@ -106,7 +106,7 @@ func (h *AdminHandler) ToggleGalleryUpload(w http.ResponseWriter, r *http.Reques
 func (h *AdminHandler) ListAllFish(w http.ResponseWriter, r *http.Request) {
 	rows, err := h.DB.Query(
 		`SELECT f.id, f.photo_filename, f.latitude, f.longitude, f.address_hint,
-		        f.spotted_by, u.username, f.created_at
+		        f.spotted_by, COALESCE(NULLIF(u.display_name, ''), u.username), f.created_at
 		 FROM fish f
 		 JOIN users u ON u.id = f.spotted_by
 		 ORDER BY f.created_at DESC`,
@@ -210,7 +210,7 @@ func (h *AdminHandler) Stats(w http.ResponseWriter, r *http.Request) {
 // ListCollections returns all collections for admin review.
 func (h *AdminHandler) ListCollections(w http.ResponseWriter, r *http.Request) {
 	rows, err := h.DB.Query(
-		`SELECT c.id, c.fish_id, cu.username, su.username, f.latitude, f.longitude, c.created_at
+		`SELECT c.id, c.fish_id, cCOALESCE(NULLIF(u.display_name, ''), u.username), sCOALESCE(NULLIF(u.display_name, ''), u.username), f.latitude, f.longitude, c.created_at
 		 FROM collections c
 		 JOIN fish f ON f.id = c.fish_id
 		 JOIN users cu ON cu.id = c.user_id

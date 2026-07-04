@@ -28,6 +28,19 @@ export function App() {
   const [stats, setStats] = useState<UserStats | null>(null);
   const [hideNav, setHideNav] = useState(false);
 
+  // Dark mode
+  const [dark, setDark] = useState(() => {
+    const saved = localStorage.getItem('darkMode');
+    if (saved !== null) return saved === 'true';
+    return window.matchMedia('(prefers-color-scheme: dark)').matches;
+  });
+
+  useEffect(() => {
+    document.documentElement.classList.toggle('dark', dark);
+    document.documentElement.classList.toggle('light', !dark);
+    localStorage.setItem('darkMode', String(dark));
+  }, [dark]);
+
   const refreshStats = useCallback(() => {
     api.getMyStats()
       .then(s => setStats({ spotted: s.spotted, collected: s.collected, display_name: s.display_name, has_avatar: s.has_avatar, user_id: s.user_id }))
@@ -82,6 +95,10 @@ export function App() {
       {!hideNav && (
         <header class="top-bar">
           <div class="top-bar-brand">🐟 Ryby z Dupom</div>
+          <div style="display:flex;align-items:center;gap:6px;">
+            <button class="dark-toggle" onClick={() => setDark(d => !d)} title={dark ? 'Tryb jasny' : 'Tryb ciemny'}>
+              {dark ? '☀️' : '🌙'}
+            </button>
           <button class="profile-widget" onClick={() => navigate('profile')}>
             <span class="profile-widget-name">{displayName}</span>
             {stats && (
@@ -98,6 +115,7 @@ export function App() {
               </span>
             )}
           </button>
+          </div>
         </header>
       )}
 

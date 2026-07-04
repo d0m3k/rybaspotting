@@ -30,6 +30,8 @@ export function ProfilePage({ auth, onLogout }: Props) {
   const [loading, setLoading] = useState(true);
   const [avatarUploading, setAvatarUploading] = useState(false);
   const [avatarKey, setAvatarKey] = useState(0); // cache-bust
+  const [editingName, setEditingName] = useState(false);
+  const [nameDraft, setNameDraft] = useState('');
   const avatarInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -44,6 +46,17 @@ export function ProfilePage({ auth, onLogout }: Props) {
     }).catch(console.error)
       .finally(() => setLoading(false));
   }, [auth.userId]);
+
+  async function handleSaveName(e?: Event) {
+    if (e) e.preventDefault();
+    const name = nameDraft.trim();
+    if (!name || name === displayName) { setEditingName(false); return; }
+    try {
+      await api.updateDisplayName(name);
+      setStats(prev => prev ? { ...prev, display_name: name } : null);
+    } catch (err: any) { alert(err.message); }
+    setEditingName(false);
+  }
 
   async function handleAvatarUpload(e: Event) {
     const input = e.target as HTMLInputElement;
@@ -149,7 +162,24 @@ export function ProfilePage({ auth, onLogout }: Props) {
         {avatarUrl && <div style="font-size:10px;color:#4ECDC4;margin-top:-6px;margin-bottom:8px;cursor:pointer;" onClick={() => avatarInputRef.current?.click()}>zmień zdjęcie</div>}
         <input ref={avatarInputRef} type="file" accept="image/*" style="display:none;" onChange={handleAvatarUpload} />
 
-        <div class="profile-name">{displayName}</div>
+        <div class="profile-name" onClick={() => { setNameDraft(displayName); setEditingName(true); }} title="Kliknij, by edytować">
+          {editingName ? (
+            <form onSubmit={handleSaveName} style="display:flex;gap:6px;justify-content:center;">
+              <input
+                class="input"
+                type="text"
+                value={nameDraft}
+                onInput={(e: any) => setNameDraft(e.target.value)}
+                onBlur={handleSaveName}
+                maxLength={50}
+                autoFocus
+                style="width:180px;margin-bottom:0;font-size:16px;padding:6px 10px;text-align:center;"
+              />
+            </form>
+          ) : (
+            <>{displayName} <span style="font-size:12px;color:var(--text-muted);">✎</span></>
+          )}
+        </div>
         <div class="profile-username">@{auth.username}</div>
 
         <div class="profile-badges">

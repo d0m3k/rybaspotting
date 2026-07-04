@@ -99,6 +99,12 @@ export const api = {
       body: formData,
     }),
 
+  updateDisplayName: (displayName: string) =>
+    request<{ message: string; display_name: string }>('/api/users/me/display-name', {
+      method: 'PUT',
+      body: JSON.stringify({ display_name: displayName }),
+    }),
+
   // Admin (protected by JWT — only users with is_admin=true)
   getAdminStats: () =>
     request<{
