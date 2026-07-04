@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'preact/hooks';
 import { loadAuth, clearAuth, saveAuth, AuthState } from './stores/auth';
+import { api } from './api';
 import { LoginPage } from './pages/Login';
 import { RegisterPage } from './pages/Register';
 import { MapPage } from './pages/Map';
@@ -12,10 +13,17 @@ import { NavBar } from './components/NavBar';
 
 type Page = 'login' | 'register' | 'map' | 'spot' | 'upload' | 'leaderboard' | 'profile' | 'admin';
 
+interface UserStats {
+  spotted: number;
+  collected: number;
+  display_name: string;
+}
+
 export function App() {
   const [auth, setAuth] = useState<AuthState | null>(loadAuth);
   const [page, setPage] = useState<Page>(auth ? 'map' : 'login');
   const [allowUpload, setAllowUpload] = useState(false);
+  const [stats, setStats] = useState<UserStats | null>(null);
 
   useEffect(() => {
     // Fetch config for gallery upload toggle
@@ -23,6 +31,10 @@ export function App() {
       fetch('/api/config')
         .then(r => r.json())
         .then(c => setAllowUpload(c.allow_gallery_upload))
+        .catch(() => {});
+      // Fetch user stats for the top-bar widget
+      api.getMyStats()
+        .then(s => setStats({ spotted: s.spotted, collected: s.collected, display_name: s.display_name }))
         .catch(() => {});
     }
   }, [auth]);
@@ -38,10 +50,17 @@ export function App() {
   function handleLogout() {
     clearAuth();
     setAuth(null);
+    setStats(null);
     setPage('login');
   }
 
   function navigate(p: Page) {
+    if (p === 'profile') {
+      // Refresh stats when navigating to profile
+      api.getMyStats()
+        .then(s => setStats({ spotted: s.spotted, collected: s.collected, display_name: s.display_name }))
+        .catch(() => {});
+    }
     setPage(p);
   }
 
@@ -52,8 +71,27 @@ export function App() {
     return <LoginPage onLogin={handleLogin} onRegister={() => setPage('register')} />;
   }
 
+  const displayName = stats?.display_name || auth.displayName || auth.username;
+
   return (
     <div class="app-container">
+      {/* Top bar with profile widget */}
+      <header class="top-bar">
+        <div class="top-bar-brand">🐟 Ryby z Dupom</div>
+        <button class="profile-widget" onClick={() => navigate('profile')}>
+          <span class="profile-widget-name">{displayName}</span>
+          {stats && (
+            <span class="profile-widget-stats">
+              <span class="stat-badge stat-spotted">S {stats.spotted}</span>
+              <span class="stat-badge stat-collected">C {stats.collected}</span>
+            </span>
+          )}
+          <span class="profile-widget-avatar">
+            {(displayName || '?').charAt(0).toUpperCase()}
+          </span>
+        </button>
+      </header>
+
       <div class="app-content">
         {page === 'map' && <MapPage />}
         {page === 'spot' && <SpotPage />}

@@ -13,6 +13,7 @@ export function LoginPage({ onLogin, onRegister }: Props) {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [showAbout, setShowAbout] = useState(false);
 
   async function handleSubmit(e: Event) {
     e.preventDefault();
@@ -70,6 +71,46 @@ export function LoginPage({ onLogin, onRegister }: Props) {
             Zarejestruj się
           </span>
         </p>
+      </div>
+
+      {/* Welcome / About section */}
+      <div class="welcome-section">
+        <button
+          class="welcome-toggle"
+          onClick={() => setShowAbout(!showAbout)}
+        >
+          {showAbout ? '✕' : '🐟'} O co chodzi? {showAbout ? '' : '(kliknij)'}
+        </button>
+        {showAbout && (
+          <div class="welcome-content">
+            <p>
+              <strong>Ryby z Dupom</strong> to legendarne graffiti z Krakowa — ryba
+              z… no cóż, z dupą. Nasza aplikacja pozwala tropić je w terenie!
+            </p>
+            <div class="welcome-cards">
+              <div class="welcome-card welcome-spot">
+                <div class="welcome-card-icon">📸</div>
+                <h4>Spotting</h4>
+                <p>
+                  Znajdujesz <strong>nową</strong> rybę, robisz zdjęcie i zgłaszasz.
+                  Zostajesz jej odkrywcą i trafia na mapę!
+                </p>
+              </div>
+              <div class="welcome-card welcome-collect">
+                <div class="welcome-card-icon">🎣</div>
+                <h4>Collecting</h4>
+                <p>
+                  Trafiasz na <strong>już oznaczoną</strong> rybę — potwierdzasz, że
+                  nadal tam jest. Dołączasz do listy zbieraczy!
+                </p>
+              </div>
+            </div>
+            <p class="welcome-footer">
+              🗺️ Przeglądaj mapę, 📸 spotuj nowe ryby, 🎣 zbieraj istniejące
+              i 🏆 wspinaj się w rankingu!
+            </p>
+          </div>
+        )}
       </div>
     </div>
   );

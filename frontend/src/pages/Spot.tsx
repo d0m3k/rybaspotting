@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from 'preact/hooks';
 import { api } from '../api';
 import { LocationPicker } from '../components/LocationPicker';
+import { LocationPreview } from '../components/LocationPreview';
 
 type Step = 'start' | 'confirm' | 'done';
 
@@ -490,15 +491,14 @@ export function SpotPage() {
 
           <img src={photoUrl} alt="captured" class="photo-preview" />
 
-          {/* ── Coordinates ── */}
+          {/* ── Location preview with mini-map ── */}
           {!useManualCoords && gpsStatus === 'ok' && (
-            <p class="coords-display">
-              📍 {lat.toFixed(5)}, {lng.toFixed(5)}{' '}
-              <a href="#" style={{ fontSize: '12px', color: '#4ECDC4' }}
-                onClick={(e) => { e.preventDefault(); setShowMapPicker(true); }}>
-                (zmień na mapie)
-              </a>
-            </p>
+            <LocationPreview
+              lat={lat}
+              lng={lng}
+              onChange={() => setShowMapPicker(true)}
+              onAddress={(r) => { if (r?.displayName) setAddressHint(r.displayName); }}
+            />
           )}
 
           {(useManualCoords || gpsStatus === 'failed') && (

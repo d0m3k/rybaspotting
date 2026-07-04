@@ -10,33 +10,68 @@ interface NavBarProps {
 }
 
 export function NavBar({ current, onNavigate, allowUpload, isAdmin }: NavBarProps) {
-  const tabs: { page: Page; label: string; icon: string }[] = [
+  // Left-side tabs (before the center spot button)
+  const leftTabs: { page: Page; label: string; icon: string }[] = [
     { page: 'map', label: 'Mapa', icon: '🗺️' },
-    { page: 'spot', label: 'Spot', icon: '📸' },
-  ];
-  if (allowUpload) {
-    tabs.push({ page: 'upload', label: 'Wgraj', icon: '📂' });
-  }
-  tabs.push(
     { page: 'leaderboard', label: 'Ranking', icon: '🏆' },
-    { page: 'profile', label: 'Profil', icon: '👤' },
-  );
-  if (isAdmin) {
-    tabs.push({ page: 'admin', label: 'Admin', icon: '🔑' });
+  ];
+
+  // Right-side tabs (after the center spot button)
+  const rightTabs: { page: Page; label: string; icon: string }[] = [];
+  if (allowUpload) {
+    rightTabs.push({ page: 'upload', label: 'Wgraj', icon: '📂' });
   }
+  if (isAdmin) {
+    rightTabs.push({ page: 'admin', label: 'Admin', icon: '🔑' });
+  }
+
+  const isSpotActive = current === 'spot';
 
   return (
     <nav class="nav-bar">
-      {tabs.map(tab => (
+      {/* Background bar behind everything */}
+      <div class="nav-bar-bg"></div>
+
+      {/* Left side */}
+      <div class="nav-side nav-left">
+        {leftTabs.map(tab => (
+          <button
+            key={tab.page}
+            class={`nav-btn ${current === tab.page ? 'active' : ''}`}
+            onClick={() => onNavigate(tab.page)}
+          >
+            <span class="nav-icon">{tab.icon}</span>
+            <span class="nav-label">{tab.label}</span>
+          </button>
+        ))}
+      </div>
+
+      {/* Center Spot button */}
+      <div class="nav-center">
         <button
-          key={tab.page}
-          class={`nav-btn ${current === tab.page ? 'active' : ''}`}
-          onClick={() => onNavigate(tab.page)}
+          class={`nav-spot-btn ${isSpotActive ? 'active' : ''}`}
+          onClick={() => onNavigate('spot')}
+          aria-label="Spotuj rybę"
         >
-          <span class="nav-icon">{tab.icon}</span>
-          <span class="nav-label">{tab.label}</span>
+          <span class="nav-spot-icon">📸</span>
         </button>
-      ))}
+        <span class="nav-spot-label">Spot</span>
+      </div>
+
+      {/* Right side */}
+      <div class="nav-side nav-right">
+        {rightTabs.map(tab => (
+          <button
+            key={tab.page}
+            class={`nav-btn ${current === tab.page ? 'active' : ''}`}
+            onClick={() => onNavigate(tab.page)}
+          >
+            <span class="nav-icon">{tab.icon}</span>
+            <span class="nav-label">{tab.label}</span>
+          </button>
+        ))}
+      </div>
+
       <div style="position:absolute;top:-12px;right:4px;font-size:9px;color:#ccc;background:#FFF8F0;padding:0 3px;border-radius:3px;">
         {__BUILD_HASH__}
       </div>

@@ -11,6 +11,27 @@ L.Icon.Default.mergeOptions({
   shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
 });
 
+// Custom fish icon for map markers
+const fishIconHtml = `
+<svg width="36" height="36" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+  <polygon points="15,50 0,35 10,50 0,65" fill="#FF6B6B" stroke="#E55A5A" stroke-width="1.5"/>
+  <ellipse cx="55" cy="50" rx="35" ry="22" fill="#FF8E72" stroke="#E57A5E" stroke-width="1.5"/>
+  <ellipse cx="82" cy="42" rx="12" ry="10" fill="#FFB3A7" stroke="#E57A5E" stroke-width="1"/>
+  <ellipse cx="82" cy="58" rx="12" ry="10" fill="#FFB3A7" stroke="#E57A5E" stroke-width="1"/>
+  <line x1="82" y1="47" x2="82" y2="53" stroke="#E57A5E" stroke-width="1" stroke-linecap="round"/>
+  <circle cx="32" cy="45" r="6" fill="white" stroke="#333" stroke-width="1"/>
+  <circle cx="34" cy="44" r="3" fill="#333"/>
+  <polygon points="45,28 55,10 70,28" fill="#FF6B6B" stroke="#E55A5A" stroke-width="1" fill-opacity="0.8"/>
+</svg>`;
+
+const fishIcon = L.divIcon({
+  className: 'fish-marker-icon',
+  html: fishIconHtml,
+  iconSize: [36, 36],
+  iconAnchor: [18, 36],
+  popupAnchor: [0, -36],
+});
+
 export function MapPage() {
   const mapRef = useRef<L.Map | null>(null);
   const markersRef = useRef<L.Marker[]>([]);
@@ -54,7 +75,7 @@ export function MapPage() {
     markersRef.current = [];
 
     fish.forEach(f => {
-      const marker = L.marker([f.latitude, f.longitude])
+      const marker = L.marker([f.latitude, f.longitude], { icon: fishIcon })
         .addTo(map)
         .on('click', () => {
           setSelectedFish(f);
