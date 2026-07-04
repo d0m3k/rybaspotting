@@ -74,6 +74,7 @@ func main() {
 	r.Use(chimw.Recoverer)
 	r.Use(chimw.RealIP)
 	r.Use(corsMiddleware)
+	r.Use(noCacheMiddleware)
 
 	// Public endpoints
 	r.Route("/api", func(r chi.Router) {
@@ -136,6 +137,16 @@ func corsMiddleware(next http.Handler) http.Handler {
 			w.WriteHeader(http.StatusOK)
 			return
 		}
+		next.ServeHTTP(w, r)
+	})
+}
+
+// noCacheMiddleware prevents browsers and service workers from caching API responses.
+func noCacheMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Cache-Control", "no-cache, no-store, must-revalidate")
+		w.Header().Set("Pragma", "no-cache")
+		w.Header().Set("Expires", "0")
 		next.ServeHTTP(w, r)
 	})
 }

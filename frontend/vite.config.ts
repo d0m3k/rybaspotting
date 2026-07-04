@@ -16,8 +16,34 @@ export default defineConfig({
     preact(),
     VitePWA({
       registerType: 'autoUpdate',
+      // Use virtual module so we can show a reload prompt
+      injectRegister: 'auto',
       workbox: {
-        globPatterns: ['**/*.{js,css,html,ico,png,svg,jpg}'],
+        // Don't precache index.html — the navigation route handles it
+        globPatterns: ['**/*.{js,css,ico,png,svg,jpg,webmanifest}'],
+        // Navigation requests that hit these patterns should NOT be served index.html
+        navigateFallbackDenylist: [/^\/api\//, /^\/photos\//],
+        // Navigation fallback serves index.html for all other routes (SPA)
+        navigateFallback: '/index.html',
+        runtimeCaching: [
+          {
+            urlPattern: /^\/api\/.*/,
+            handler: 'NetworkFirst',
+            options: {
+              cacheName: 'api-cache',
+              expiration: { maxEntries: 30, maxAgeSeconds: 120 },
+              networkTimeoutSeconds: 5,
+            },
+          },
+          {
+            urlPattern: /^\/photos\/.*/,
+            handler: 'StaleWhileRevalidate',
+            options: {
+              cacheName: 'photo-cache',
+              expiration: { maxEntries: 200, maxAgeSeconds: 86400 },
+            },
+          },
+        ],
       },
       manifest: {
         name: 'Ryby z Dupom — Spotter',
