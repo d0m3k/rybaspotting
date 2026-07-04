@@ -12,21 +12,21 @@ function Root() {
     updateServiceWorker,
   } = useRegisterSW({
     onRegistered(swReg) {
+      // Force immediate SW update check so we don't wait for browser's periodic check
+      swReg?.update().catch(() => {});
+
       // Listen for controller changes — new SW with skipWaiting took over
       navigator.serviceWorker?.addEventListener('controllerchange', () => {
-        // Only reload if there was a previous SW (not first install)
         if (hadController) {
           window.location.reload();
         }
         hadController = true;
       });
 
-      // Also show update prompt if there's already a waiting worker
       if (swReg?.waiting) {
         setNeedRefresh(true);
       }
 
-      // Detect newly installed workers (fallback for browsers that don't skipWaiting fast enough)
       swReg?.addEventListener('updatefound', () => {
         const newWorker = swReg.installing;
         if (newWorker) {
