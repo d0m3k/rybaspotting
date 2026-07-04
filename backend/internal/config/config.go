@@ -3,6 +3,7 @@ package config
 import (
 	"os"
 	"strconv"
+	"strings"
 	"sync"
 )
 
@@ -14,6 +15,7 @@ type Config struct {
 	PhotoDir           string
 	NearbyRadiusMeters float64
 	MaxPhotoWidth      int
+	CaptchaAnswers     []string
 
 	mu                   sync.RWMutex
 	allowGalleryUpload   bool
@@ -28,6 +30,7 @@ func Load() *Config {
 		PhotoDir:           getEnv("PHOTO_DIR", "/var/lib/rybaspotting/photos"),
 		NearbyRadiusMeters: getEnvFloat("NEARBY_RADIUS_METERS", 50),
 		MaxPhotoWidth:      getEnvInt("MAX_PHOTO_WIDTH", 1200),
+		CaptchaAnswers:     getEnvList("CAPTCHA_ANSWERS", []string{"dupom", "dupą", "dupa"}),
 		allowGalleryUpload: getEnvBool("ALLOW_GALLERY_UPLOAD", false),
 	}
 	return cfg
@@ -81,6 +84,23 @@ func getEnvBool(key string, fallback bool) bool {
 		b, err := strconv.ParseBool(v)
 		if err == nil {
 			return b
+		}
+	}
+	return fallback
+}
+
+func getEnvList(key string, fallback []string) []string {
+	if v := os.Getenv(key); v != "" {
+		parts := strings.Split(v, ",")
+		result := make([]string, 0, len(parts))
+		for _, p := range parts {
+			p = strings.TrimSpace(p)
+			if p != "" {
+				result = append(result, strings.ToLower(p))
+			}
+		}
+		if len(result) > 0 {
+			return result
 		}
 	}
 	return fallback
