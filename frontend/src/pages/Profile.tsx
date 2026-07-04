@@ -23,7 +23,8 @@ function getInitial(name: string): string {
 
 export function ProfilePage({ auth, onLogout }: Props) {
   const [stats, setStats] = useState<UserStats | null>(null);
-  const [myFish, setMyFish] = useState<any[]>([]);
+  const [mySpotted, setMySpotted] = useState<any[]>([]);
+  const [myCollected, setMyCollected] = useState<any[]>([]);
   const [expandedFish, setExpandedFish] = useState<any | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -31,9 +32,11 @@ export function ProfilePage({ auth, onLogout }: Props) {
     Promise.all([
       api.getMyStats().catch(() => null),
       api.listFish(1, 200).catch(() => []),
-    ]).then(([s, fish]) => {
+      api.getMyCollections().catch(() => []),
+    ]).then(([s, fish, collected]) => {
       setStats(s);
-      setMyFish((fish as any[]).filter((f: any) => f.spotted_by === auth.userId));
+      setMySpotted((fish as any[]).filter((f: any) => f.spotted_by === auth.userId));
+      setMyCollected(collected as any[]);
     }).catch(console.error)
       .finally(() => setLoading(false));
   }, [auth.userId]);
@@ -43,6 +46,40 @@ export function ProfilePage({ auth, onLogout }: Props) {
 
   if (loading) {
     return <div class="page"><p class="loading-text">Ładowanie profilu…</p></div>;
+  }
+
+  function renderFishItem(f: any, showCollectedAt?: boolean) {
+    const isExpanded = expandedFish?.id === f.id;
+    return (
+      <div key={f.id + (showCollectedAt ? '-c' : '-s')} style="display: contents;">
+        <div class="my-fish-item" onClick={() => setExpandedFish(isExpanded ? null : f)} style="cursor:pointer;">
+          <img src={`/api/photos/${f.photo_filename}`} alt="ryba" class="mini-thumb" />
+          <div>
+            <p style="font-weight:500;font-size:14px;">
+              {f.address_hint ? `📍 ${f.address_hint}` : `📍 ${f.latitude?.toFixed(4)}, ${f.longitude?.toFixed(4)}`}
+            </p>
+            {showCollectedAt && (
+              <p class="date">Zebrana: {new Date(f.collected_at).toLocaleDateString('pl-PL')}</p>
+            )}
+            <p class="date">{new Date(f.created_at).toLocaleDateString('pl-PL')}</p>
+          </div>
+        </div>
+        {isExpanded && (
+          <div style="background:#fff;border-radius:14px;padding:12px;box-shadow:0 2px 12px rgba(0,0,0,0.08);margin-bottom:8px;">
+            <img
+              src={`/api/photos/${f.photo_filename}`}
+              alt="ryba"
+              style="width:100%;max-height:300px;object-fit:cover;border-radius:10px;margin-bottom:8px;"
+            />
+            <p style="font-weight:600;font-size:15px;">
+              {f.address_hint || `${f.latitude?.toFixed(5)}, ${f.longitude?.toFixed(5)}`}
+            </p>
+            {showCollectedAt && <p style="font-size:12px;color:#4ECDC4;margin-top:4px;">Zebrana: {new Date(f.collected_at).toLocaleDateString('pl-PL')}</p>}
+            <p style="font-size:12px;color:#999;margin-top:4px;">{new Date(f.created_at).toLocaleDateString('pl-PL')}</p>
+          </div>
+        )}
+      </div>
+    );
   }
 
   return (
@@ -72,47 +109,33 @@ export function ProfilePage({ auth, onLogout }: Props) {
         )}
       </div>
 
-      <h3>Moje spotted ryby ({myFish.length})</h3>
-      {myFish.length === 0 ? (
+      <button class="btn btn-logout" onClick={onLogout} style="margin-top:0;margin-bottom:20px;font-size:13px;padding:8px;">
+        Wyloguj
+      </button>
+
+      <h3>Moje spotted ryby ({mySpotted.length})</h3>
+      {mySpotted.length === 0 ? (
         <p style="text-align:center; color:#999; padding: 20px 0;">
           Nie spottedowałeś jeszcze żadnej ryby. 🐟<br />
           <span style="font-size:13px;">Przejdź do zakładki <strong>Spot</strong> aby dodać pierwszą!</span>
         </p>
       ) : (
         <div class="my-fish-list">
-          {myFish.map(f => {
-            const isExpanded = expandedFish?.id === f.id;
-            return (
-              <div key={f.id} style={{ display: 'contents' }}>
-                <div class="my-fish-item" onClick={() => setExpandedFish(isExpanded ? null : f)} style="cursor:pointer;">
-                  <img src={`/api/photos/${f.photo_filename}`} alt="ryba" class="mini-thumb" />
-                  <div>
-                    <p style="font-weight:500;font-size:14px;">📍 {f.latitude.toFixed(4)}, {f.longitude.toFixed(4)}</p>
-                    {f.address_hint && <p style="font-size:12px;color:#999;">{f.address_hint}</p>}
-                    <p class="date">{new Date(f.created_at).toLocaleDateString('pl-PL')}</p>
-                  </div>
-                </div>
-                {isExpanded && (
-                  <div style="background:#fff;border-radius:14px;padding:12px;box-shadow:0 2px 12px rgba(0,0,0,0.08);margin-bottom:8px;">
-                    <img
-                      src={`/api/photos/${f.photo_filename}`}
-                      alt="ryba"
-                      style="width:100%;max-height:300px;object-fit:cover;border-radius:10px;margin-bottom:8px;"
-                    />
-                    <p style="font-weight:600;font-size:15px;">📍 {f.latitude.toFixed(5)}, {f.longitude.toFixed(5)}</p>
-                    {f.address_hint && <p style="font-size:13px;color:#7F8C8D;margin-top:4px;">{f.address_hint}</p>}
-                    <p style="font-size:12px;color:#999;margin-top:4px;">{new Date(f.created_at).toLocaleDateString('pl-PL')}</p>
-                  </div>
-                )}
-              </div>
-            );
-          })}
+          {mySpotted.map(f => renderFishItem(f))}
         </div>
       )}
 
-      <button class="btn btn-logout" onClick={onLogout}>
-        Wyloguj
-      </button>
+      <h3 style="margin-top:24px;">Zebrane ryby ({myCollected.length})</h3>
+      {myCollected.length === 0 ? (
+        <p style="text-align:center; color:#999; padding: 20px 0;">
+          Nie zebrałeś jeszcze żadnej ryby. 🎣<br />
+          <span style="font-size:13px;">Znajdź rybę na <strong>Mapie</strong> i kliknij Collect!</span>
+        </p>
+      ) : (
+        <div class="my-fish-list">
+          {myCollected.map(f => renderFishItem(f, true))}
+        </div>
+      )}
     </div>
   );
 }

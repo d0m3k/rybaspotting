@@ -75,7 +75,6 @@ html, body {
 
 .page {
   padding: 16px;
-  padding-top: 60px;
   position: relative;
 }
 
@@ -441,6 +440,19 @@ html, body {
   font-size: 13px;
   color: #7F8C8D;
   margin-bottom: 4px;
+}
+
+.fish-date {
+  font-size: 12px;
+  color: #999;
+  margin-bottom: 4px;
+}
+
+.fish-collectors {
+  font-size: 13px;
+  color: #4ECDC4;
+  margin-bottom: 10px;
+  font-weight: 500;
 }
 
 /* === Spot / Upload === */
@@ -830,19 +842,16 @@ h3 {
 
 /* === Top Bar (profile widget) === */
 .top-bar {
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
   display: flex;
   align-items: center;
   justify-content: space-between;
   padding: 8px 14px;
   padding-top: max(8px, env(safe-area-inset-top, 0px));
-  background: linear-gradient(180deg, rgba(255,248,240,0.95) 0%, rgba(255,248,240,0.85) 100%);
-  border-bottom: 1px solid rgba(255, 107, 107, 0.08);
+  background: #FFF8F0;
+  border-bottom: 1px solid rgba(255, 107, 107, 0.12);
   z-index: 100;
-  backdrop-filter: blur(6px);
+  flex-shrink: 0;
+  position: relative;
 }
 
 .top-bar-brand {
@@ -1066,4 +1075,5 @@ h3 {
 .fish-marker-icon {
   background: none !important;
   border: none !important;
+  filter: drop-shadow(0 2px 3px rgba(0,0,0,0.45));
 }

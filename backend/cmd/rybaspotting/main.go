@@ -105,6 +105,7 @@ func main() {
 
 			// User stats
 			r.Get("/users/me", userH.Me)
+			r.Get("/users/me/collections", userH.MyCollections)
 
 			// Admin-only endpoints
 			r.Group(func(r chi.Router) {

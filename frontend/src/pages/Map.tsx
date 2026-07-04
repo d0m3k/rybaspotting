@@ -13,23 +13,29 @@ L.Icon.Default.mergeOptions({
 
 // Custom fish icon for map markers
 const fishIconHtml = `
-<svg width="36" height="36" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
-  <polygon points="15,50 0,35 10,50 0,65" fill="#FF6B6B" stroke="#E55A5A" stroke-width="1.5"/>
-  <ellipse cx="55" cy="50" rx="35" ry="22" fill="#FF8E72" stroke="#E57A5E" stroke-width="1.5"/>
-  <ellipse cx="82" cy="42" rx="12" ry="10" fill="#FFB3A7" stroke="#E57A5E" stroke-width="1"/>
-  <ellipse cx="82" cy="58" rx="12" ry="10" fill="#FFB3A7" stroke="#E57A5E" stroke-width="1"/>
-  <line x1="82" y1="47" x2="82" y2="53" stroke="#E57A5E" stroke-width="1" stroke-linecap="round"/>
-  <circle cx="32" cy="45" r="6" fill="white" stroke="#333" stroke-width="1"/>
-  <circle cx="34" cy="44" r="3" fill="#333"/>
-  <polygon points="45,28 55,10 70,28" fill="#FF6B6B" stroke="#E55A5A" stroke-width="1" fill-opacity="0.8"/>
+<svg width="40" height="40" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <filter id="fishShadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="1.5" stdDeviation="2.5" flood-color="#000" flood-opacity="0.35"/>
+    </filter>
+  </defs>
+  <ellipse cx="55" cy="50" rx="33" ry="44" fill="white" opacity="0.25" filter="url(#fishShadow)"/>
+  <polygon points="15,50 0,35 10,50 0,65" fill="#FF6B6B" stroke="#C0392B" stroke-width="2"/>
+  <ellipse cx="55" cy="50" rx="35" ry="22" fill="#FF8E72" stroke="#C0392B" stroke-width="2.5"/>
+  <ellipse cx="82" cy="42" rx="12" ry="10" fill="#FFB3A7" stroke="#C0392B" stroke-width="1.5"/>
+  <ellipse cx="82" cy="58" rx="12" ry="10" fill="#FFB3A7" stroke="#C0392B" stroke-width="1.5"/>
+  <line x1="82" y1="47" x2="82" y2="53" stroke="#C0392B" stroke-width="1.5" stroke-linecap="round"/>
+  <circle cx="32" cy="45" r="7" fill="white" stroke="#333" stroke-width="1.5"/>
+  <circle cx="34" cy="44" r="3.5" fill="#222"/>
+  <polygon points="45,28 55,8 70,28" fill="#FF6B6B" stroke="#C0392B" stroke-width="2" fill-opacity="0.85"/>
 </svg>`;
 
 const fishIcon = L.divIcon({
   className: 'fish-marker-icon',
   html: fishIconHtml,
-  iconSize: [36, 36],
-  iconAnchor: [18, 36],
-  popupAnchor: [0, -36],
+  iconSize: [40, 40],
+  iconAnchor: [20, 40],
+  popupAnchor: [0, -40],
 });
 
 export function MapPage() {
@@ -37,7 +43,9 @@ export function MapPage() {
   const markersRef = useRef<L.Marker[]>([]);
   const [fishList, setFishList] = useState<any[]>([]);
   const [selectedFish, setSelectedFish] = useState<any | null>(null);
+  const [fishDetail, setFishDetail] = useState<any | null>(null);
   const [loading, setLoading] = useState(true);
+  const [detailLoading, setDetailLoading] = useState(false);
 
   useEffect(() => {
     const map = L.map('map').setView([50.0647, 19.9450], 13);
@@ -77,8 +85,18 @@ export function MapPage() {
     fish.forEach(f => {
       const marker = L.marker([f.latitude, f.longitude], { icon: fishIcon })
         .addTo(map)
-        .on('click', () => {
+        .on('click', async () => {
           setSelectedFish(f);
+          setFishDetail(null);
+          setDetailLoading(true);
+          try {
+            const detail = await api.getFish(f.id);
+            setFishDetail(detail);
+          } catch {
+            setFishDetail(null);
+          } finally {
+            setDetailLoading(false);
+          }
         });
       markersRef.current.push(marker);
     });
@@ -103,19 +121,32 @@ export function MapPage() {
 
       {selectedFish && (
         <div class="bottom-sheet">
-          <button class="close-btn" onClick={() => setSelectedFish(null)}>✕</button>
+          <button class="close-btn" onClick={() => { setSelectedFish(null); setFishDetail(null); }}>✕</button>
           <img
             src={`/api/photos/${selectedFish.photo_filename}`}
             alt="Ryba"
             class="fish-preview"
           />
           <p class="fish-spotter">🐟 Spotter: {selectedFish.spotter_name}</p>
-          <p class="fish-coords">
-            {selectedFish.latitude.toFixed(5)}, {selectedFish.longitude.toFixed(5)}
+          <p class="fish-date">
+            📅 {new Date(selectedFish.created_at).toLocaleDateString('pl-PL', { year: 'numeric', month: 'long', day: 'numeric' })}
           </p>
-          {selectedFish.address_hint && (
-            <p class="fish-address">{selectedFish.address_hint}</p>
+          {selectedFish.address_hint ? (
+            <p class="fish-address">📍 {selectedFish.address_hint}</p>
+          ) : (
+            <p class="fish-coords">
+              {selectedFish.latitude.toFixed(5)}, {selectedFish.longitude.toFixed(5)}
+            </p>
           )}
+          <p class="fish-collectors">
+            {detailLoading ? (
+              'Ładowanie…'
+            ) : fishDetail?.collectors ? (
+              <>🎣 Zebrana {fishDetail.collectors.length}× — {fishDetail.collectors.map((c: any) => c.username).join(', ')}</>
+            ) : (
+              '🎣 Brak zbieraczy'
+            )}
+          </p>
           <button
             class="btn btn-primary"
             onClick={() => handleCollect(selectedFish.id)}

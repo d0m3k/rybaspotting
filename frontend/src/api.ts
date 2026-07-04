@@ -85,6 +85,9 @@ export const api = {
       collected: number;
     }>('/api/users/me'),
 
+  getMyCollections: () =>
+    request<any[]>('/api/users/me/collections'),
+
   // Admin (protected by JWT — only users with is_admin=true)
   getAdminStats: () =>
     request<{

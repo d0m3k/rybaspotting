@@ -10,14 +10,15 @@ interface NavBarProps {
 }
 
 export function NavBar({ current, onNavigate, allowUpload, isAdmin }: NavBarProps) {
-  // Left-side tabs (before the center spot button)
+  // Left-side tabs — always just Mapa
   const leftTabs: { page: Page; label: string; icon: string }[] = [
     { page: 'map', label: 'Mapa', icon: '🗺️' },
-    { page: 'leaderboard', label: 'Ranking', icon: '🏆' },
   ];
 
-  // Right-side tabs (after the center spot button)
-  const rightTabs: { page: Page; label: string; icon: string }[] = [];
+  // Right-side tabs — Ranking always present, plus extras
+  const rightTabs: { page: Page; label: string; icon: string }[] = [
+    { page: 'leaderboard', label: 'Ranking', icon: '🏆' },
+  ];
   if (allowUpload) {
     rightTabs.push({ page: 'upload', label: 'Wgraj', icon: '📂' });
   }
@@ -32,7 +33,7 @@ export function NavBar({ current, onNavigate, allowUpload, isAdmin }: NavBarProp
       {/* Background bar behind everything */}
       <div class="nav-bar-bg"></div>
 
-      {/* Left side */}
+      {/* Left side — 1 tab */}
       <div class="nav-side nav-left">
         {leftTabs.map(tab => (
           <button
@@ -58,7 +59,7 @@ export function NavBar({ current, onNavigate, allowUpload, isAdmin }: NavBarProp
         <span class="nav-spot-label">Spot</span>
       </div>
 
-      {/* Right side */}
+      {/* Right side — Ranking + extras */}
       <div class="nav-side nav-right">
         {rightTabs.map(tab => (
           <button
