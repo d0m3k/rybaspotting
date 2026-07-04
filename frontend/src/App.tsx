@@ -17,6 +17,8 @@ interface UserStats {
   spotted: number;
   collected: number;
   display_name: string;
+  has_avatar: boolean;
+  user_id: number;
 }
 
 export function App() {
@@ -28,7 +30,7 @@ export function App() {
 
   const refreshStats = useCallback(() => {
     api.getMyStats()
-      .then(s => setStats({ spotted: s.spotted, collected: s.collected, display_name: s.display_name }))
+      .then(s => setStats({ spotted: s.spotted, collected: s.collected, display_name: s.display_name, has_avatar: s.has_avatar, user_id: s.user_id }))
       .catch(() => {});
   }, []);
 
@@ -88,9 +90,13 @@ export function App() {
                 <span class="stat-badge stat-collected">C {stats.collected}</span>
               </span>
             )}
-            <span class="profile-widget-avatar">
-              {(displayName || '?').charAt(0).toUpperCase()}
-            </span>
+            {stats?.has_avatar ? (
+              <span class="profile-widget-avatar" style={{ backgroundImage: `url(/api/users/avatar/${stats.user_id})`, backgroundSize: 'cover', backgroundPosition: 'center' }}></span>
+            ) : (
+              <span class="profile-widget-avatar">
+                {(displayName || '?').charAt(0).toUpperCase()}
+              </span>
+            )}
           </button>
         </header>
       )}

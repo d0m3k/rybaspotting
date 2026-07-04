@@ -333,6 +333,57 @@ func (h *FishHandler) Config(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+// DeleteMyFish deletes a fish entry by ID. Only the original spotter can delete it.
+func (h *FishHandler) DeleteMyFish(w http.ResponseWriter, r *http.Request) {
+	userID, _ := r.Context().Value(middleware.ContextUserID).(int)
+	idStr := chi.URLParam(r, "id")
+	id, err := strconv.Atoi(idStr)
+	if err != nil {
+		http.Error(w, `{"error":"invalid fish id"}`, http.StatusBadRequest)
+		return
+	}
+
+	// Check ownership
+	var spottedBy int
+	err = h.DB.QueryRow(`SELECT spotted_by FROM fish WHERE id = $1`, id).Scan(&spottedBy)
+	if err == sql.ErrNoRows {
+		http.Error(w, `{"error":"fish not found"}`, http.StatusNotFound)
+		return
+	}
+	if err != nil {
+		http.Error(w, `{"error":"internal error"}`, http.StatusInternalServerError)
+		return
+	}
+	if spottedBy != userID {
+		http.Error(w, `{"error":"you can only delete your own spots"}`, http.StatusForbidden)
+		return
+	}
+
+	// Get photo filename before deleting
+	var filename string
+	h.DB.QueryRow(`SELECT photo_filename FROM fish WHERE id = $1`, id).Scan(&filename)
+
+	// Delete from DB
+	_, err = h.DB.Exec(`DELETE FROM fish WHERE id = $1`, id)
+	if err != nil {
+		http.Error(w, `{"error":"internal error"}`, http.StatusInternalServerError)
+		return
+	}
+
+	// Delete photo files
+	if filename != "" {
+		ext := filepath.Ext(filename)
+		baseName := filename[:len(filename)-len(ext)]
+		photoPath := filepath.Join(h.Cfg.PhotoDir, filename)
+		thumbPath := filepath.Join(h.Cfg.PhotoDir, baseName+"_thumb"+ext)
+		os.Remove(photoPath)
+		os.Remove(thumbPath)
+	}
+
+	log.Printf("[FISH] type=deleted_by_owner fish_id=%d user_id=%d", id, userID)
+	writeJSON(w, http.StatusOK, map[string]string{"message": "fish deleted"})
+}
+
 // ServePhoto serves a photo or thumbnail from the photo directory.
 func (h *FishHandler) ServePhoto(w http.ResponseWriter, r *http.Request) {
 	filename := chi.URLParam(r, "filename")

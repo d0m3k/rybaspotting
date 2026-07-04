@@ -75,21 +75,46 @@ export function ProfilePage({ auth, onLogout }: Props) {
     return <div class="page"><p class="loading-text">Ładowanie profilu…</p></div>;
   }
 
-  function renderFishItem(f: any, showCollectedAt?: boolean) {
+  async function handleDeleteSpotted(fishId: number) {
+    if (!confirm('Usunąć tę rybę? Zdjęcie i dane zostaną trwale usunięte.')) return;
+    try {
+      await api.deleteMyFish(fishId);
+      setMySpotted(prev => prev.filter(f => f.id !== fishId));
+    } catch (err: any) { alert(err.message); }
+  }
+
+  async function handleUncollect(fishId: number) {
+    if (!confirm('Usunąć to zebranie?')) return;
+    try {
+      await api.uncollect(fishId);
+      setMyCollected(prev => prev.filter(f => f.id !== fishId));
+    } catch (err: any) { alert(err.message); }
+  }
+
+  function renderFishItem(f: any, showCollectedAt?: boolean, allowDelete?: boolean, onDelete?: (id: number) => void) {
     const isExpanded = expandedFish?.id === f.id;
     return (
       <div key={f.id + (showCollectedAt ? '-c' : '-s')} style="display: contents;">
-        <div class="my-fish-item" onClick={() => setExpandedFish(isExpanded ? null : f)} style="cursor:pointer;">
-          <img src={`/api/photos/${f.photo_filename}`} alt="ryba" class="mini-thumb" />
-          <div>
-            <p style="font-weight:500;font-size:14px;">
-              {f.address_hint ? `📍 ${f.address_hint}` : `📍 ${f.latitude?.toFixed(4)}, ${f.longitude?.toFixed(4)}`}
-            </p>
-            {showCollectedAt && (
-              <p class="date">Zebrana: {new Date(f.collected_at).toLocaleDateString('pl-PL')}</p>
-            )}
-            <p class="date">{new Date(f.created_at).toLocaleDateString('pl-PL')}</p>
+        <div class="my-fish-item" style="cursor:pointer;position:relative;">
+          <div style="display:flex;gap:12px;align-items:center;flex:1;" onClick={() => setExpandedFish(isExpanded ? null : f)}>
+            <img src={`/api/photos/${f.photo_filename}`} alt="ryba" class="mini-thumb" />
+            <div style="flex:1;">
+              <p style="font-weight:500;font-size:14px;">
+                {f.address_hint ? `📍 ${f.address_hint}` : `📍 ${f.latitude?.toFixed(4)}, ${f.longitude?.toFixed(4)}`}
+              </p>
+              {showCollectedAt && (
+                <p class="date">Zebrana: {new Date(f.collected_at).toLocaleDateString('pl-PL')}</p>
+              )}
+              <p class="date">{new Date(f.created_at).toLocaleDateString('pl-PL')}</p>
+            </div>
           </div>
+          {allowDelete && onDelete && (
+            <button
+              onClick={(e) => { e.stopPropagation(); onDelete(f.id); }}
+              style="background:none;border:none;font-size:16px;cursor:pointer;padding:4px 8px;color:#ccc;flex-shrink:0;"
+              title="Usuń"
+            >🗑</button>
+          )}
         </div>
         {isExpanded && (
           <div style="background:#fff;border-radius:14px;padding:12px;box-shadow:0 2px 12px rgba(0,0,0,0.08);margin-bottom:8px;">
@@ -116,6 +141,11 @@ export function ProfilePage({ auth, onLogout }: Props) {
           {!avatarUrl && initial}
           {avatarUploading && <div class="avatar-uploading">⏳</div>}
         </div>
+        {!avatarUrl && !avatarUploading && (
+          <div style="font-size:10px;color:#999;margin-top:-6px;margin-bottom:8px;cursor:pointer;" onClick={() => avatarInputRef.current?.click()}>
+            kliknij, by dodać zdjęcie
+          </div>
+        )}
         {avatarUrl && <div style="font-size:10px;color:#4ECDC4;margin-top:-6px;margin-bottom:8px;cursor:pointer;" onClick={() => avatarInputRef.current?.click()}>zmień zdjęcie</div>}
         <input ref={avatarInputRef} type="file" accept="image/*" style="display:none;" onChange={handleAvatarUpload} />
 
@@ -153,7 +183,7 @@ export function ProfilePage({ auth, onLogout }: Props) {
           <span style="font-size:13px;">Przejdź do zakładki <strong>Spot</strong> aby dodać pierwszą!</span>
         </p>
       ) : (
-        <div class="my-fish-list">{mySpotted.map(f => renderFishItem(f))}</div>
+        <div class="my-fish-list">{mySpotted.map(f => renderFishItem(f, false, true, handleDeleteSpotted))}</div>
       )}
 
       <h3 style="margin-top:24px;">Zebrane ryby ({myCollected.length})</h3>
@@ -163,7 +193,7 @@ export function ProfilePage({ auth, onLogout }: Props) {
           <span style="font-size:13px;">Znajdź rybę na <strong>Mapie</strong> i kliknij Collect!</span>
         </p>
       ) : (
-        <div class="my-fish-list">{myCollected.map(f => renderFishItem(f, true))}</div>
+        <div class="my-fish-list">{myCollected.map(f => renderFishItem(f, true, true, handleUncollect))}</div>
       )}
     </div>
   );

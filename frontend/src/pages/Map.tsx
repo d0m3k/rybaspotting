@@ -183,8 +183,13 @@ export function MapPage({ onStatsChanged, userId }: { onStatsChanged?: () => voi
           <p class="fish-collectors">
             {detailLoading ? (
               'Ładowanie…'
-            ) : fishDetail?.collectors ? (
-              <>🎣 Zebrana {fishDetail.collectors.length}× — {fishDetail.collectors.map((c: any) => c.username).join(', ')}</>
+            ) : fishDetail?.collectors?.length > 0 ? (
+              <>
+                🎣 Zebrana {fishDetail.collectors.length}× — {fishDetail.collectors.map((c: any) => c.username).join(', ')}
+                <br /><span class="fish-last-collected">
+                  Ostatnio: {new Date(fishDetail.collectors[fishDetail.collectors.length - 1].collected_at).toLocaleDateString('pl-PL', { day: 'numeric', month: 'short', year: 'numeric' })}
+                </span>
+              </>
             ) : (
               '🎣 Brak zbieraczy'
             )}

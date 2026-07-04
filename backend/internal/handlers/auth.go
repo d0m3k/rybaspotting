@@ -49,8 +49,9 @@ func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Simple captcha — "Ryby z czym?" → "dupom"
-	if strings.ToLower(strings.TrimSpace(req.Captcha)) != "dupom" {
+	// Simple captcha — "Ryby z czym?" → "dupom" or "dupą"
+	answer := strings.ToLower(strings.TrimSpace(req.Captcha))
+	if answer != "dupom" && answer != "dupą" {
 		http.Error(w, `{"error":"wrong answer to the ryba question"}`, http.StatusBadRequest)
 		return
 	}

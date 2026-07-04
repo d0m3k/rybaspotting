@@ -104,6 +104,7 @@ func main() {
 			r.Use(middleware.AuthMiddleware(cfg))
 
 			r.Post("/fish", fishH.Create)
+			r.Delete("/fish/{id}", fishH.DeleteMyFish)
 			r.Post("/fish/{id}/collect", collectH.Collect)
 			r.Delete("/fish/{id}/collect", collectH.Uncollect)
 

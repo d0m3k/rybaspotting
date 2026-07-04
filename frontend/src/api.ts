@@ -67,6 +67,10 @@ export const api = {
       headers: liveCapture ? { 'X-Live-Capture': 'true' } : {},
     }),
 
+  // Delete your own spot (only if you're the spotter)
+  deleteMyFish: (id: number) =>
+    request(`/api/fish/${id}`, { method: 'DELETE' }),
+
   // Collect
   collect: (fishId: number) =>
     request(`/api/fish/${fishId}/collect`, { method: 'POST' }),
