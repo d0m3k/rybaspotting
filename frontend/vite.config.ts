@@ -21,9 +21,9 @@ export default defineConfig({
       workbox: {
         // Don't precache index.html — the navigation route handles it
         globPatterns: ['**/*.{js,css,ico,png,svg,jpg,webmanifest}'],
-        // Navigation requests that hit these patterns should NOT be served index.html
+        // Navigation: don't intercept API/photo URLs
         navigateFallbackDenylist: [/^\/api\//, /^\/photos\//],
-        // Navigation fallback serves index.html for all other routes (SPA)
+        // Navigate fallback serves index.html (fetched from network since it's not precached)
         navigateFallback: '/index.html',
         runtimeCaching: [
           {
