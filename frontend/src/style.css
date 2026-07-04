@@ -28,6 +28,7 @@
   --coords-bg: linear-gradient(135deg, #FFF0E0, #FFE8D6);
   --card-shadow: 0 1px 4px rgba(0,0,0,0.04);
   --sheet-bg: #fff;
+  --auth-bg: linear-gradient(160deg, #FFF8F0 0%, #FFE8D6 50%, #FFF8F0 100%);
 }
 
 html.dark {
@@ -47,6 +48,7 @@ html.dark {
   --coords-bg: linear-gradient(135deg, #222b3d, #1e2a3a);
   --card-shadow: 0 1px 4px rgba(0,0,0,0.2);
   --sheet-bg: #1e2a3a;
+  --auth-bg: linear-gradient(160deg, #1a1a2e 0%, #121a2a 50%, #1a1a2e 100%);
 }
 
 @media (prefers-color-scheme: dark) {
@@ -67,6 +69,7 @@ html.dark {
     --coords-bg: linear-gradient(135deg, #222b3d, #1e2a3a);
     --card-shadow: 0 1px 4px rgba(0,0,0,0.2);
     --sheet-bg: #1e2a3a;
+    --auth-bg: linear-gradient(160deg, #1a1a2e 0%, #121a2a 50%, #1a1a2e 100%);
   }
 }
 
@@ -286,7 +289,7 @@ html, body {
   min-height: 100%;
   padding: 24px;
   padding-top: 48px;
-  background: linear-gradient(160deg, #FFF8F0 0%, #FFE8D6 50%, #FFF8F0 100%);
+  background: var(--auth-bg);
   overflow-y: auto;
   gap: 20px;
 }
@@ -295,7 +298,7 @@ html, body {
   background: var(--bg-secondary);
   padding: 36px 28px;
   border-radius: 20px;
-  box-shadow: 0 4px 24px rgba(255, 107, 107, 0.1), 0 1px 4px rgba(0,0,0,0.04);
+  box-shadow: var(--card-shadow);
   width: 100%;
   max-width: 380px;
 }
@@ -527,7 +530,7 @@ html, body {
   color: var(--text-secondary);
   margin-bottom: 8px;
   padding: 8px 12px;
-  background: #F5F5F5;
+  background: var(--bg-highlight);
   border-radius: 8px;
   text-align: center;
   font-style: italic;
@@ -728,7 +731,7 @@ html, body {
   font-size: 12px;
   text-transform: uppercase;
   letter-spacing: 0.5px;
-  background: #FFF0E0;
+  background: var(--bg-highlight);
   border: none;
 }
 
@@ -738,7 +741,7 @@ html, body {
 }
 
 .leaderboard-table tr:not(:last-child) td {
-  border-bottom: 1px solid #F0E0D0;
+  border-bottom: 1px solid var(--border);
 }
 
 .leaderboard-table tr:nth-child(even) td {
@@ -1085,7 +1088,7 @@ h3 {
 }
 
 .welcome-content {
-  background: rgba(255,255,255,0.92);
+  background: var(--bg-card);
   border-radius: 16px;
   padding: 16px;
   margin-top: 10px;
@@ -1135,12 +1138,12 @@ h3 {
 
 .welcome-spot {
   border-color: rgba(255, 107, 107, 0.25);
-  background: linear-gradient(135deg, #FFF5F5, #FFFAF5);
+  background: var(--bg-highlight);
 }
 
 .welcome-collect {
   border-color: rgba(78, 205, 196, 0.25);
-  background: linear-gradient(135deg, #F5FFFD, #FFFAF5);
+  background: var(--bg-highlight);
 }
 
 .welcome-footer {
