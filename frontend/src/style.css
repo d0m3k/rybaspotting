@@ -704,6 +704,7 @@ html, body {
   box-shadow: 0 4px 16px rgba(255, 107, 107, 0.35);
   user-select: none;
   position: relative;
+  cursor: pointer;
 }
 
 .profile-avatar::after {
@@ -718,6 +719,18 @@ html, body {
 @keyframes spin {
   from { transform: rotate(0deg); }
   to { transform: rotate(360deg); }
+}
+
+.avatar-uploading {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0,0,0,0.4);
+  border-radius: 50%;
+  font-size: 24px;
+  color: #fff;
 }
 
 .profile-name {

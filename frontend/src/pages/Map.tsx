@@ -2,6 +2,8 @@ import { useEffect, useRef, useState } from 'preact/hooks';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { api } from '../api';
+import { distanceMeters } from '../distance';
+import { loadAuth } from '../stores/auth';
 
 // Fix Leaflet default icon issue
 delete (L.Icon.Default.prototype as any)._getIconUrl;
@@ -102,7 +104,31 @@ export function MapPage({ onStatsChanged, userId }: { onStatsChanged?: () => voi
     });
   }
 
-  async function handleCollect(fishId: number) {
+  async function handleCollect(fishId: number, fishLat: number, fishLng: number) {
+    const auth = loadAuth();
+    const isAdmin = auth?.isAdmin ?? false;
+
+    // Check 50m radius (admins bypass this)
+    if (!isAdmin) {
+      try {
+        const pos = await new Promise<GeolocationPosition>((resolve, reject) => {
+          navigator.geolocation.getCurrentPosition(resolve, reject, {
+            enableHighAccuracy: true,
+            timeout: 8000,
+            maximumAge: 30000,
+          });
+        });
+        const dist = distanceMeters(pos.coords.latitude, pos.coords.longitude, fishLat, fishLng);
+        if (dist > 50) {
+          alert(`Jesteś za daleko! (${dist.toFixed(0)}m od ryby, max 50m). Podejdź bliżej.`);
+          return;
+        }
+      } catch {
+        alert('Nie można sprawdzić Twojej lokalizacji. Włącz GPS aby zebrać rybę.');
+        return;
+      }
+    }
+
     const ok = window.confirm('Czy na pewno jesteś na miejscu i chcesz zebrać tę rybę? 🎣');
     if (!ok) return;
 
@@ -172,7 +198,7 @@ export function MapPage({ onStatsChanged, userId }: { onStatsChanged?: () => voi
           {canCollect && (
             <button
               class="btn btn-primary"
-              onClick={() => handleCollect(selectedFish.id)}
+              onClick={() => handleCollect(selectedFish.id, selectedFish.latitude, selectedFish.longitude)}
             >
               Collect! 🎣
             </button>

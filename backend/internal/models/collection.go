@@ -9,6 +9,16 @@ type Collection struct {
 	CreatedAt time.Time `json:"created_at"`
 }
 
+type AdminCollectionEntry struct {
+	ID           int       `json:"id"`
+	FishID       int       `json:"fish_id"`
+	CollectorName string   `json:"collector_name"`
+	SpotterName  string    `json:"spotter_name"`
+	Latitude     float64   `json:"latitude"`
+	Longitude    float64   `json:"longitude"`
+	CreatedAt    time.Time `json:"created_at"`
+}
+
 type LeaderboardEntry struct {
 	Username string `json:"username"`
 	Count    int    `json:"count"`

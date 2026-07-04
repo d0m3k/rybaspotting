@@ -15,10 +15,14 @@ interface Props {
   initialLng?: number;
   onConfirm: (lat: number, lng: number, address: string) => void;
   onCancel: () => void;
+  // Optional: show a limit circle (e.g. 100m radius from original GPS)
+  limitCenter?: { lat: number; lng: number };
+  limitRadiusM?: number;
 }
 
-export function LocationPicker({ initialLat, initialLng, onConfirm, onCancel }: Props) {
+export function LocationPicker({ initialLat, initialLng, onConfirm, onCancel, limitCenter, limitRadiusM }: Props) {
   const mapRef = useRef<L.Map | null>(null);
+  const circleRef = useRef<L.Circle | null>(null);
   const centerRef = useRef({ lat: initialLat || 50.0647, lng: initialLng || 19.9450 });
   const [address, setAddress] = useState('');
   const [resolving, setResolving] = useState(false);
@@ -41,6 +45,19 @@ export function LocationPicker({ initialLat, initialLng, onConfirm, onCancel }: 
       attribution: '&copy; OSM',
     }).addTo(map);
 
+    // Draw the limit circle if specified
+    if (limitCenter && limitRadiusM) {
+      const circle = L.circle([limitCenter.lat, limitCenter.lng], {
+        radius: limitRadiusM,
+        color: '#FF6B6B',
+        fillColor: '#FF6B6B',
+        fillOpacity: 0.08,
+        weight: 2,
+        dashArray: '6 4',
+      }).addTo(map);
+      circleRef.current = circle;
+    }
+
     // Update center coordinate on every move
     map.on('moveend', () => {
       const pos = map.getCenter();
@@ -52,9 +69,10 @@ export function LocationPicker({ initialLat, initialLng, onConfirm, onCancel }: 
     resolve(c.lat, c.lng);
 
     return () => map.remove();
-  }, [resolve]);
+  }, [resolve, limitCenter, limitRadiusM]);
 
   const c = centerRef.current;
+  const hasLimit = !!(limitCenter && limitRadiusM);
 
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 2000, background: '#fff', display: 'flex', flexDirection: 'column' }}>
@@ -65,6 +83,7 @@ export function LocationPicker({ initialLat, initialLng, onConfirm, onCancel }: 
           <div style={{ fontWeight: 600, fontSize: '14px' }}>Wybierz lokalizację</div>
           <div style={{ fontSize: '12px', color: resolving ? '#999' : '#7F8C8D', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
             {resolving ? 'Sprawdzanie adresu…' : (address || 'Przewiń mapę, by ustawić punkt')}
+            {hasLimit && <span style="color:#FF6B6B;font-weight:500;"> · max {limitRadiusM}m</span>}
           </div>
         </div>
       </div>
@@ -86,7 +105,7 @@ export function LocationPicker({ initialLat, initialLng, onConfirm, onCancel }: 
         {c.lat.toFixed(5)}, {c.lng.toFixed(5)}
       </div>
 
-      {/* Confirm — with safe area padding for bottom nav */}
+      {/* Confirm */}
       <div style={{ padding: '12px 16px', paddingBottom: `calc(12px + env(safe-area-inset-bottom, 0px))`, flexShrink: 0 }}>
         <button class="btn btn-primary" onClick={() => onConfirm(c.lat, c.lng, address)}>✅ Potwierdź lokalizację</button>
       </div>

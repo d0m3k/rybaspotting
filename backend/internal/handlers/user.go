@@ -2,14 +2,25 @@ package handlers
 
 import (
 	"database/sql"
+	"fmt"
+	"log"
 	"net/http"
+	"os"
+	"path/filepath"
+	"strconv"
+	"strings"
 	"time"
 
+	"rybaspotting/internal/config"
 	"rybaspotting/internal/middleware"
+
+	"github.com/disintegration/imaging"
+	"github.com/go-chi/chi/v5"
 )
 
 type UserHandler struct {
-	DB *sql.DB
+	DB  *sql.DB
+	Cfg *config.Config
 }
 
 type userStatsResponse struct {
@@ -19,6 +30,7 @@ type userStatsResponse struct {
 	IsAdmin     bool   `json:"is_admin"`
 	Spotted     int    `json:"spotted"`
 	Collected   int    `json:"collected"`
+	HasAvatar   bool   `json:"has_avatar"`
 }
 
 type collectedFishResponse struct {
@@ -58,6 +70,12 @@ func (h *UserHandler) Me(w http.ResponseWriter, r *http.Request) {
 		`SELECT COUNT(*) FROM collections WHERE user_id = $1`, userID,
 	).Scan(&resp.Collected)
 
+	// Check avatar
+	avatarPath := filepath.Join(h.Cfg.PhotoDir, "avatars", fmt.Sprintf("%d.jpg", userID))
+	if _, err := os.Stat(avatarPath); err == nil {
+		resp.HasAvatar = true
+	}
+
 	writeJSON(w, http.StatusOK, resp)
 }
 
@@ -92,4 +110,80 @@ func (h *UserHandler) MyCollections(w http.ResponseWriter, r *http.Request) {
 	}
 
 	writeJSON(w, http.StatusOK, result)
+}
+
+// UploadAvatar handles profile picture upload. Always replaces the old one.
+func (h *UserHandler) UploadAvatar(w http.ResponseWriter, r *http.Request) {
+	userID, _ := r.Context().Value(middleware.ContextUserID).(int)
+
+	if err := r.ParseMultipartForm(2 << 20); err != nil {
+		http.Error(w, `{"error":"file too large (max 2MB)"}`, http.StatusBadRequest)
+		return
+	}
+
+	file, _, err := r.FormFile("avatar")
+	if err != nil {
+		http.Error(w, `{"error":"avatar file required"}`, http.StatusBadRequest)
+		return
+	}
+	defer file.Close()
+
+	// Ensure avatars directory exists
+	avatarDir := filepath.Join(h.Cfg.PhotoDir, "avatars")
+	if err := os.MkdirAll(avatarDir, 0755); err != nil {
+		http.Error(w, `{"error":"internal error"}`, http.StatusInternalServerError)
+		return
+	}
+
+	// Decode, crop to 200x200 square, save as JPEG
+	src, err := imaging.Decode(file, imaging.AutoOrientation(true))
+	if err != nil {
+		http.Error(w, `{"error":"invalid image"}`, http.StatusBadRequest)
+		return
+	}
+
+	thumb := imaging.Fill(src, 200, 200, imaging.Center, imaging.Lanczos)
+
+	// Save as {userId}.jpg — always replaces
+	avatarPath := filepath.Join(avatarDir, fmt.Sprintf("%d.jpg", userID))
+	out, err := os.Create(avatarPath)
+	if err != nil {
+		http.Error(w, `{"error":"internal error"}`, http.StatusInternalServerError)
+		return
+	}
+	defer out.Close()
+
+	if err := imaging.Encode(out, thumb, imaging.JPEG, imaging.JPEGQuality(80)); err != nil {
+		http.Error(w, `{"error":"internal error"}`, http.StatusInternalServerError)
+		return
+	}
+
+	log.Printf("[USER] type=avatar_upload user_id=%d", userID)
+	writeJSON(w, http.StatusOK, map[string]string{"message": "avatar uploaded"})
+}
+
+// ServeAvatar serves a user's profile picture by user ID.
+func (h *UserHandler) ServeAvatar(w http.ResponseWriter, r *http.Request) {
+	idStr := chi.URLParam(r, "userID")
+	id, err := strconv.Atoi(idStr)
+	if err != nil {
+		http.Error(w, "invalid user id", http.StatusBadRequest)
+		return
+	}
+
+	avatarPath := filepath.Join(h.Cfg.PhotoDir, "avatars", fmt.Sprintf("%d.jpg", id))
+	if _, err := os.Stat(avatarPath); os.IsNotExist(err) {
+		http.Error(w, "not found", http.StatusNotFound)
+		return
+	}
+
+	// Security: validate the path doesn't escape
+	if strings.Contains(avatarPath, "..") {
+		http.Error(w, "invalid path", http.StatusBadRequest)
+		return
+	}
+
+	w.Header().Set("Content-Type", "image/jpeg")
+	w.Header().Set("Cache-Control", "public, max-age=3600")
+	http.ServeFile(w, r, avatarPath)
 }

@@ -2,6 +2,8 @@ import { useState, useRef, useEffect } from 'preact/hooks';
 import { api } from '../api';
 import { LocationPicker } from '../components/LocationPicker';
 import { LocationPreview } from '../components/LocationPreview';
+import { distanceMeters } from '../distance';
+import { loadAuth } from '../stores/auth';
 
 type Step = 'start' | 'confirm' | 'done';
 
@@ -20,6 +22,8 @@ export function SpotPage({ onHideNav, onStatsChanged }: Props) {
   const [manualLng, setManualLng] = useState('');
   const [useManualCoords, setUseManualCoords] = useState(false);
   const [gpsStatus, setGpsStatus] = useState<'idle' | 'loading' | 'ok' | 'failed'>('idle');
+  const [originalLat, setOriginalLat] = useState<number>(0);
+  const [originalLng, setOriginalLng] = useState<number>(0);
   const [nearbyFish, setNearbyFish] = useState<any[]>([]);
   const [nearbyBeforeCapture, setNearbyBeforeCapture] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
@@ -137,6 +141,8 @@ export function SpotPage({ onHideNav, onStatsChanged }: Props) {
       if (loc) {
         setLat(loc.lat);
         setLng(loc.lng);
+        setOriginalLat(loc.lat);
+        setOriginalLng(loc.lng);
         setManualLat(String(loc.lat));
         setManualLng(String(loc.lng));
         setGpsStatus('ok');
@@ -351,6 +357,8 @@ export function SpotPage({ onHideNav, onStatsChanged }: Props) {
       if (loc) {
         setLat(loc.lat);
         setLng(loc.lng);
+        setOriginalLat(loc.lat);
+        setOriginalLng(loc.lng);
         setManualLat(String(loc.lat));
         setManualLng(String(loc.lng));
         setGpsStatus('ok');
@@ -501,7 +509,21 @@ export function SpotPage({ onHideNav, onStatsChanged }: Props) {
             <LocationPicker
               initialLat={lat || 50.0647}
               initialLng={lng || 19.9450}
+              limitCenter={originalLat ? { lat: originalLat, lng: originalLng } : undefined}
+              limitRadiusM={loadAuth()?.isAdmin ? undefined : 100}
               onConfirm={(newLat, newLng, address) => {
+                const auth = loadAuth();
+                const isAdmin = auth?.isAdmin ?? false;
+
+                // Check 100m correction limit (admins bypass)
+                if (!isAdmin && originalLat && originalLng) {
+                  const dist = distanceMeters(originalLat, originalLng, newLat, newLng);
+                  if (dist > 100) {
+                    alert(`Możesz przesunąć pinezkę max 100m od oryginalnej lokalizacji. Obecnie: ${dist.toFixed(0)}m.`);
+                    return;
+                  }
+                }
+
                 setLat(newLat);
                 setLng(newLng);
                 setUseManualCoords(false);

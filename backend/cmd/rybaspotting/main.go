@@ -64,7 +64,7 @@ func main() {
 	fishH := &handlers.FishHandler{DB: conn, Cfg: cfg}
 	collectH := &handlers.CollectHandler{DB: conn}
 	leaderboardH := &handlers.LeaderboardHandler{DB: conn}
-	userH := &handlers.UserHandler{DB: conn}
+	userH := &handlers.UserHandler{DB: conn, Cfg: cfg}
 
 	// Build router
 	r := chi.NewRouter()
@@ -96,6 +96,9 @@ func main() {
 		// Photo serving
 		r.Get("/photos/{filename}", fishH.ServePhoto)
 
+		// Avatar serving (public, by user ID)
+		r.Get("/users/avatar/{userID}", userH.ServeAvatar)
+
 		// Auth-protected endpoints
 		r.Group(func(r chi.Router) {
 			r.Use(middleware.AuthMiddleware(cfg))
@@ -107,16 +110,20 @@ func main() {
 			// User stats
 			r.Get("/users/me", userH.Me)
 			r.Get("/users/me/collections", userH.MyCollections)
+			r.Post("/users/me/avatar", userH.UploadAvatar)
 
 			// Admin-only endpoints
 			r.Group(func(r chi.Router) {
 				r.Use(middleware.RequireAdmin)
 
 				r.Post("/admin/promote", adminH.PromoteUser)
+				r.Post("/admin/demote", adminH.DemoteUser)
 				r.Post("/admin/toggle-upload-mode", adminH.ToggleGalleryUpload)
 				r.Get("/admin/stats", adminH.Stats)
 				r.Get("/admin/fish", adminH.ListAllFish)
 				r.Delete("/admin/fish/{id}", adminH.DeleteFish)
+				r.Get("/admin/collections", adminH.ListCollections)
+				r.Delete("/admin/collections/{id}", adminH.DeleteCollection)
 			})
 		})
 	})

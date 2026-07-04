@@ -83,10 +83,17 @@ export const api = {
       is_admin: boolean;
       spotted: number;
       collected: number;
+      has_avatar: boolean;
     }>('/api/users/me'),
 
   getMyCollections: () =>
     request<any[]>('/api/users/me/collections'),
+
+  uploadAvatar: (formData: FormData) =>
+    request('/api/users/me/avatar', {
+      method: 'POST',
+      body: formData,
+    }),
 
   // Admin (protected by JWT — only users with is_admin=true)
   getAdminStats: () =>
@@ -109,6 +116,19 @@ export const api = {
   // Admin — delete a fish (hard delete)
   deleteFish: (id: number) =>
     request(`/api/admin/fish/${id}`, { method: 'DELETE' }),
+
+  // Admin — collections
+  listCollections: () =>
+    request<any[]>('/api/admin/collections'),
+
+  deleteCollection: (id: number) =>
+    request(`/api/admin/collections/${id}`, { method: 'DELETE' }),
+
+  // Admin — demote user
+  demoteUser: (username: string) =>
+    request(`/api/admin/demote?username=${encodeURIComponent(username)}`, {
+      method: 'POST',
+    }),
 
   // Leaderboard
   leaderboard: () =>

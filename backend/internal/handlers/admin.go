@@ -55,6 +55,42 @@ func (h *AdminHandler) PromoteUser(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]string{"message": "user promoted to admin"})
 }
 
+// DemoteUser removes admin privileges from a user.
+func (h *AdminHandler) DemoteUser(w http.ResponseWriter, r *http.Request) {
+	username := r.URL.Query().Get("username")
+	if username == "" {
+		http.Error(w, `{"error":"username query parameter required"}`, http.StatusBadRequest)
+		return
+	}
+
+	// Don't allow demoting yourself
+	adminID, _ := r.Context().Value(middleware.ContextUserID).(int)
+	var adminName string
+	h.DB.QueryRow(`SELECT username FROM users WHERE id = $1`, adminID).Scan(&adminName)
+	if username == adminName {
+		http.Error(w, `{"error":"cannot demote yourself"}`, http.StatusForbidden)
+		return
+	}
+
+	res, err := h.DB.Exec(
+		`UPDATE users SET is_admin = false WHERE username = $1`,
+		username,
+	)
+	if err != nil {
+		http.Error(w, `{"error":"internal error"}`, http.StatusInternalServerError)
+		return
+	}
+	rows, _ := res.RowsAffected()
+	if rows == 0 {
+		http.Error(w, `{"error":"user not found"}`, http.StatusNotFound)
+		return
+	}
+
+	log.Printf("[ADMIN] type=demote_user admin_id=%d target=%s", adminID, username)
+
+	writeJSON(w, http.StatusOK, map[string]string{"message": "user demoted from admin"})
+}
+
 // ToggleGalleryUpload flips the runtime allowGalleryUpload flag.
 func (h *AdminHandler) ToggleGalleryUpload(w http.ResponseWriter, r *http.Request) {
 	current := h.Cfg.AllowGalleryUpload()
@@ -169,4 +205,60 @@ func (h *AdminHandler) Stats(w http.ResponseWriter, r *http.Request) {
 	resp.PhotoSizeMB = resp.PhotoSizeMB / (1024 * 1024)
 
 	writeJSON(w, http.StatusOK, resp)
+}
+
+// ListCollections returns all collections for admin review.
+func (h *AdminHandler) ListCollections(w http.ResponseWriter, r *http.Request) {
+	rows, err := h.DB.Query(
+		`SELECT c.id, c.fish_id, cu.username, su.username, f.latitude, f.longitude, c.created_at
+		 FROM collections c
+		 JOIN fish f ON f.id = c.fish_id
+		 JOIN users cu ON cu.id = c.user_id
+		 JOIN users su ON su.id = f.spotted_by
+		 ORDER BY c.created_at DESC
+		 LIMIT 500`,
+	)
+	if err != nil {
+		http.Error(w, `{"error":"internal error"}`, http.StatusInternalServerError)
+		return
+	}
+	defer rows.Close()
+
+	result := []models.AdminCollectionEntry{}
+	for rows.Next() {
+		var e models.AdminCollectionEntry
+		if err := rows.Scan(&e.ID, &e.FishID, &e.CollectorName, &e.SpotterName,
+			&e.Latitude, &e.Longitude, &e.CreatedAt); err != nil {
+			continue
+		}
+		result = append(result, e)
+	}
+
+	writeJSON(w, http.StatusOK, result)
+}
+
+// DeleteCollection removes a collection entry.
+func (h *AdminHandler) DeleteCollection(w http.ResponseWriter, r *http.Request) {
+	idStr := chi.URLParam(r, "id")
+	id, err := strconv.Atoi(idStr)
+	if err != nil {
+		http.Error(w, `{"error":"invalid collection id"}`, http.StatusBadRequest)
+		return
+	}
+
+	res, err := h.DB.Exec(`DELETE FROM collections WHERE id = $1`, id)
+	if err != nil {
+		http.Error(w, `{"error":"internal error"}`, http.StatusInternalServerError)
+		return
+	}
+	rows, _ := res.RowsAffected()
+	if rows == 0 {
+		http.Error(w, `{"error":"collection not found"}`, http.StatusNotFound)
+		return
+	}
+
+	adminID, _ := r.Context().Value(middleware.ContextUserID).(int)
+	log.Printf("[ADMIN] type=delete_collection admin_id=%d collection_id=%d", adminID, id)
+
+	writeJSON(w, http.StatusOK, map[string]string{"message": "collection deleted"})
 }
