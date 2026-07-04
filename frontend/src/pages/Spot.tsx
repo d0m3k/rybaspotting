@@ -21,6 +21,7 @@ export function SpotPage({ onHideNav, onStatsChanged }: Props) {
   const [useManualCoords, setUseManualCoords] = useState(false);
   const [gpsStatus, setGpsStatus] = useState<'idle' | 'loading' | 'ok' | 'failed'>('idle');
   const [nearbyFish, setNearbyFish] = useState<any[]>([]);
+  const [nearbyBeforeCapture, setNearbyBeforeCapture] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [addressHint, setAddressHint] = useState('');
   const [message, setMessage] = useState('');
@@ -58,6 +59,19 @@ export function SpotPage({ onHideNav, onStatsChanged }: Props) {
       return { lat: pos.coords.latitude, lng: pos.coords.longitude };
     } catch {
       return null;
+    }
+  }
+
+  // ── Nearby fish helper ───────────────────────────────────────────
+  async function checkNearby(checkLat: number, checkLng: number) {
+    if (!checkLat || !checkLng) return;
+    try {
+      const nearby = await api.nearbyFish(checkLat, checkLng);
+      setNearbyBeforeCapture(nearby);
+      setNearbyFish(nearby);
+    } catch {
+      setNearbyBeforeCapture([]);
+      setNearbyFish([]);
     }
   }
 
@@ -126,6 +140,7 @@ export function SpotPage({ onHideNav, onStatsChanged }: Props) {
         setManualLat(String(loc.lat));
         setManualLng(String(loc.lng));
         setGpsStatus('ok');
+        checkNearby(loc.lat, loc.lng);
       } else {
         setGpsStatus('failed');
         setUseManualCoords(true);
@@ -324,6 +339,7 @@ export function SpotPage({ onHideNav, onStatsChanged }: Props) {
     setUseManualCoords(false);
     setGpsStatus('idle');
     setNearbyFish([]);
+    setNearbyBeforeCapture([]);
     setAddressHint('');
     setMessage('');
     if (fileInputRef.current) fileInputRef.current.value = '';
@@ -336,6 +352,7 @@ export function SpotPage({ onHideNav, onStatsChanged }: Props) {
         setManualLat(String(loc.lat));
         setManualLng(String(loc.lng));
         setGpsStatus('ok');
+        checkNearby(loc.lat, loc.lng);
       } else {
         setGpsStatus('failed');
         setUseManualCoords(true);
@@ -398,6 +415,21 @@ export function SpotPage({ onHideNav, onStatsChanged }: Props) {
                 {gpsStatus === 'failed' && <span style={{ color: '#E74C3C' }}>⚠️ Brak GPS (będziesz mógł wpisać ręcznie)</span>}
               </div>
 
+              {nearbyBeforeCapture.length > 0 && (
+                <div class="nearby-section">
+                  <h3>🐟 W pobliżu ({nearbyBeforeCapture[0]?.distance_meters?.toFixed(0)}m) — zbierz!</h3>
+                  {nearbyBeforeCapture.map((f) => (
+                    <div key={f.id} class="nearby-card" onClick={() => handleCollectExisting(f.id)}>
+                      <img src={`/api/photos/${f.photo_filename}`} alt="ryba" class="nearby-thumb" />
+                      <div>
+                        <p>Spotter: {f.spotter_name}</p>
+                        <p>{f.distance_meters?.toFixed(0)}m od Ciebie</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
               <button
                 class="btn btn-primary capture-btn"
                 onClick={capturePhoto}
@@ -425,6 +457,21 @@ export function SpotPage({ onHideNav, onStatsChanged }: Props) {
                 {gpsStatus === 'ok' && <span style={{ color: '#2ECC71' }}>📍 Lokalizacja GPS pobrana</span>}
                 {gpsStatus === 'failed' && <span style={{ color: '#E74C3C' }}>⚠️ Brak GPS (będziesz mógł wpisać ręcznie)</span>}
               </div>
+
+              {nearbyBeforeCapture.length > 0 && (
+                <div class="nearby-section">
+                  <h3>🐟 W pobliżu ({nearbyBeforeCapture[0]?.distance_meters?.toFixed(0)}m) — zbierz!</h3>
+                  {nearbyBeforeCapture.map((f) => (
+                    <div key={f.id} class="nearby-card" onClick={() => handleCollectExisting(f.id)}>
+                      <img src={`/api/photos/${f.photo_filename}`} alt="ryba" class="nearby-thumb" />
+                      <div>
+                        <p>Spotter: {f.spotter_name}</p>
+                        <p>{f.distance_meters?.toFixed(0)}m od Ciebie</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
 
               <button
                 class="btn btn-primary"
@@ -459,6 +506,7 @@ export function SpotPage({ onHideNav, onStatsChanged }: Props) {
                 setGpsStatus('ok');
                 if (address) setAddressHint(address);
                 setShowMapPicker(false);
+                checkNearby(newLat, newLng);
               }}
               onCancel={() => setShowMapPicker(false)}
             />

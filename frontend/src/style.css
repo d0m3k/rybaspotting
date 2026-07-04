@@ -43,7 +43,6 @@ html, body {
 .app-content {
   flex: 1;
   overflow-y: auto;
-  padding-bottom: 80px;
 }
 
 /* === Decorative background bubbles === */
@@ -75,6 +74,7 @@ html, body {
 
 .page {
   padding: 16px;
+  padding-bottom: 96px;
   position: relative;
 }
 
