@@ -1,6 +1,17 @@
 import { useState, useEffect } from 'preact/hooks';
 import { api } from '../api';
 
+function AvatarImg({ userId, size = 28 }: { userId: number; size?: number }) {
+  return (
+    <img
+      src={`/api/users/avatar/${userId}`}
+      alt=""
+      style={`width:${size}px;height:${size}px;border-radius:50%;object-fit:cover;flex-shrink:0;background:var(--bg-highlight);`}
+      onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+    />
+  );
+}
+
 export function LeaderboardPage() {
   const [data, setData] = useState<{ top_spotters: any[]; top_collectors: any[] } | null>(null);
   const [loading, setLoading] = useState(true);
@@ -39,7 +50,10 @@ export function LeaderboardPage() {
             {spotters.map((e, i) => (
               <tr key={e.username}>
                 <td><span class="rank-medal">{medal(i)}</span> {i + 1}</td>
-                <td><strong>{e.username}</strong></td>
+                <td style="display:flex;align-items:center;gap:8px;">
+                  <AvatarImg userId={e.user_id} size={26} />
+                  <strong>{e.username}</strong>
+                </td>
                 <td>{e.count}</td>
               </tr>
             ))}
@@ -60,7 +74,10 @@ export function LeaderboardPage() {
             {collectors.map((e, i) => (
               <tr key={e.username}>
                 <td><span class="rank-medal">{medal(i)}</span> {i + 1}</td>
-                <td><strong>{e.username}</strong></td>
+                <td style="display:flex;align-items:center;gap:8px;">
+                  <AvatarImg userId={e.user_id} size={26} />
+                  <strong>{e.username}</strong>
+                </td>
                 <td>{e.count}</td>
               </tr>
             ))}

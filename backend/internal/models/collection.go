@@ -20,6 +20,7 @@ type AdminCollectionEntry struct {
 }
 
 type LeaderboardEntry struct {
+	UserID   int    `json:"user_id"`
 	Username string `json:"username"`
 	Count    int    `json:"count"`
 }

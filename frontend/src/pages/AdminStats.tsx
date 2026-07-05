@@ -228,7 +228,13 @@ export function AdminStatsPage() {
             <div key={user.id} class="admin-user-card" style={`background:var(--bg-card);border-radius:14px;padding:14px;border:1px solid var(--border);${isDeleted ? 'opacity:0.65;' : ''}`}>
               <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
                 <div style="min-width:0;">
-                  <div style="display:flex;align-items:center;gap:6px;">
+                  <div style="display:flex;align-items:center;gap:8px;">
+                    <img
+                      src={`/api/users/avatar/${user.id}`}
+                      alt=""
+                      style="width:32px;height:32px;border-radius:50%;object-fit:cover;flex-shrink:0;background:var(--bg-highlight);"
+                      onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                    />
                     <strong style={`font-size:15px;${isDeleted ? 'text-decoration:line-through;' : ''}`}>{user.display_name || user.username}</strong>
                     {user.is_admin && <span style="background:#FF6B6B;color:#fff;font-size:10px;padding:1px 6px;border-radius:4px;font-weight:600;">ADMIN</span>}
                     {isDeleted && <span style="background:#E74C3C;color:#fff;font-size:10px;padding:1px 6px;border-radius:4px;font-weight:600;">🚫 USUNIĘTY</span>}
