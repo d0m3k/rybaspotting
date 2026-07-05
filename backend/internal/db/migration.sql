@@ -34,3 +34,6 @@ CREATE TABLE IF NOT EXISTS collections (
 
 CREATE INDEX IF NOT EXISTS idx_collections_fish ON collections (fish_id);
 CREATE INDEX IF NOT EXISTS idx_collections_user ON collections (user_id);
+
+-- Soft-delete support for users (admin action)
+ALTER TABLE users ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ;

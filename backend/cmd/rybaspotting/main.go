@@ -124,6 +124,8 @@ func main() {
 				r.Get("/admin/stats", adminH.Stats)
 				r.Get("/admin/users", adminH.ListUsers)
 				r.Post("/admin/set-password", adminH.SetPassword)
+				r.Post("/admin/delete-user", adminH.DeleteUser)
+				r.Post("/admin/restore-user", adminH.RestoreUser)
 				r.Get("/admin/fish", adminH.ListAllFish)
 				r.Delete("/admin/fish/{id}", adminH.DeleteFish)
 				r.Get("/admin/collections", adminH.ListCollections)

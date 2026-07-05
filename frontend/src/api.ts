@@ -130,6 +130,17 @@ export const api = {
       body: JSON.stringify({ username, new_password: newPassword }),
     }),
 
+  // Admin — delete / restore users
+  deleteUser: (username: string) =>
+    request(`/api/admin/delete-user?username=${encodeURIComponent(username)}`, {
+      method: 'POST',
+    }),
+
+  restoreUser: (username: string) =>
+    request(`/api/admin/restore-user?username=${encodeURIComponent(username)}`, {
+      method: 'POST',
+    }),
+
   // Admin — list all fish
   listAllFish: () =>
     request<any[]>('/api/admin/fish'),

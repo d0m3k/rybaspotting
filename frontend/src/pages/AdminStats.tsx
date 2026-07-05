@@ -9,6 +9,7 @@ interface UserEntry {
   spots: number;
   collects: number;
   created_at: string;
+  deleted_at: string | null;
 }
 
 interface FishEntry {
@@ -130,6 +131,30 @@ export function AdminStatsPage() {
     }
   }
 
+  async function handleDeleteUser(username: string) {
+    if (!confirm(`Usunąć użytkownika „${username}”?\n\nJeśli ma spotted ryby — zostanie zanonimizowany.\nJeśli nie ma żadnych ryb — zostanie usunięty trwale.`)) return;
+    setActingUser(username);
+    try {
+      const res: any = await api.deleteUser(username);
+      flash(`🗑 ${res.message}`);
+      loadData();
+    } catch (err: any) {
+      flash(`❌ ${err.message}`, true);
+    }
+  }
+
+  async function handleRestoreUser(username: string) {
+    if (!confirm(`Przywrócić użytkownika „${username}”?`)) return;
+    setActingUser(username);
+    try {
+      const res: any = await api.restoreUser(username);
+      flash(`↩ ${res.message}`);
+      loadData();
+    } catch (err: any) {
+      flash(`❌ ${err.message}`, true);
+    }
+  }
+
   async function handleDeleteFish(fishId: number) {
     if (!confirm(`Usunąć rybę #${fishId}?`)) return;
     setDeletingFish(fishId);
@@ -197,15 +222,18 @@ export function AdminStatsPage() {
       {/* ── Users tab ── */}
       {tab === 'users' && (
         <div class="admin-user-list" style="margin-top:16px;display:flex;flex-direction:column;gap:10px;">
-          {users.map(user => (
-            <div key={user.id} class="admin-user-card" style="background:var(--bg-card);border-radius:14px;padding:14px;border:1px solid var(--border);">
+          {users.map(user => {
+            const isDeleted = !!user.deleted_at;
+            return (
+            <div key={user.id} class="admin-user-card" style={`background:var(--bg-card);border-radius:14px;padding:14px;border:1px solid var(--border);${isDeleted ? 'opacity:0.65;' : ''}`}>
               <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
                 <div style="min-width:0;">
                   <div style="display:flex;align-items:center;gap:6px;">
-                    <strong style="font-size:15px;">{user.display_name || user.username}</strong>
+                    <strong style={`font-size:15px;${isDeleted ? 'text-decoration:line-through;' : ''}`}>{user.display_name || user.username}</strong>
                     {user.is_admin && <span style="background:#FF6B6B;color:#fff;font-size:10px;padding:1px 6px;border-radius:4px;font-weight:600;">ADMIN</span>}
+                    {isDeleted && <span style="background:#E74C3C;color:#fff;font-size:10px;padding:1px 6px;border-radius:4px;font-weight:600;">🚫 USUNIĘTY</span>}
                   </div>
-                  <div style="font-size:12px;color:var(--text-muted);margin-top:2px;">@{user.username} · od {new Date(user.created_at).toLocaleDateString('pl-PL')}</div>
+                  <div style="font-size:12px;color:var(--text-muted);margin-top:2px;">@{user.username} · od {new Date(user.created_at).toLocaleDateString('pl-PL')}{isDeleted ? ` · usunięty ${new Date(user.deleted_at!).toLocaleDateString('pl-PL')}` : ''}</div>
                 </div>
                 <div style="display:flex;gap:12px;text-align:center;">
                   <div><div style="font-weight:700;font-size:16px;color:#FF6B6B;">{user.spots}</div><div style="font-size:11px;color:var(--text-muted);">spotów</div></div>
@@ -213,36 +241,59 @@ export function AdminStatsPage() {
                 </div>
               </div>
               <div style="display:flex;gap:6px;margin-top:10px;flex-wrap:wrap;">
-                {user.is_admin ? (
-                  <button
-                    class="btn btn-sm btn-danger"
-                    onClick={() => handleDemote(user.username)}
-                    disabled={actingUser === user.username}
-                    style="font-size:12px;padding:5px 12px;background:#E74C3C;color:#fff;border:none;border-radius:8px;cursor:pointer;"
-                  >
-                    {actingUser === user.username ? '…' : '⬇ Degraduj'}
-                  </button>
-                ) : (
+                {!isDeleted && (
+                  <>
+                    {user.is_admin ? (
+                      <button
+                        class="btn btn-sm btn-danger"
+                        onClick={() => handleDemote(user.username)}
+                        disabled={actingUser === user.username}
+                        style="font-size:12px;padding:5px 12px;background:#E74C3C;color:#fff;border:none;border-radius:8px;cursor:pointer;"
+                      >
+                        {actingUser === user.username ? '…' : '⬇ Degraduj'}
+                      </button>
+                    ) : (
+                      <button
+                        class="btn btn-sm"
+                        onClick={() => handlePromote(user.username)}
+                        disabled={actingUser === user.username}
+                        style="font-size:12px;padding:5px 12px;background:linear-gradient(135deg,#FF6B6B,#FF8E72);color:#fff;border:none;border-radius:8px;cursor:pointer;"
+                      >
+                        {actingUser === user.username ? '…' : '👑 Promuj'}
+                      </button>
+                    )}
+                    <button
+                      class="btn btn-sm"
+                      onClick={() => handleSetPassword(user.username)}
+                      disabled={actingUser === user.username}
+                      style="font-size:12px;padding:5px 12px;background:var(--bg-input);color:var(--text-secondary);border:1px solid var(--border);border-radius:8px;cursor:pointer;"
+                    >
+                      {actingUser === user.username ? '…' : '🔑 Hasło'}
+                    </button>
+                    <button
+                      class="btn btn-sm"
+                      onClick={() => handleDeleteUser(user.username)}
+                      disabled={actingUser === user.username}
+                      style="font-size:12px;padding:5px 12px;background:transparent;color:#E74C3C;border:1px solid #E74C3C;border-radius:8px;cursor:pointer;"
+                    >
+                      {actingUser === user.username ? '…' : '🗑 Usuń'}
+                    </button>
+                  </>
+                )}
+                {isDeleted && (
                   <button
                     class="btn btn-sm"
-                    onClick={() => handlePromote(user.username)}
+                    onClick={() => handleRestoreUser(user.username)}
                     disabled={actingUser === user.username}
-                    style="font-size:12px;padding:5px 12px;background:linear-gradient(135deg,#FF6B6B,#FF8E72);color:#fff;border:none;border-radius:8px;cursor:pointer;"
+                    style="font-size:12px;padding:5px 12px;background:linear-gradient(135deg,#2ECC71,#27AE60);color:#fff;border:none;border-radius:8px;cursor:pointer;"
                   >
-                    {actingUser === user.username ? '…' : '👑 Promuj'}
+                    {actingUser === user.username ? '…' : '↩ Przywróć'}
                   </button>
                 )}
-                <button
-                  class="btn btn-sm"
-                  onClick={() => handleSetPassword(user.username)}
-                  disabled={actingUser === user.username}
-                  style="font-size:12px;padding:5px 12px;background:var(--bg-input);color:var(--text-secondary);border:1px solid var(--border);border-radius:8px;cursor:pointer;"
-                >
-                  {actingUser === user.username ? '…' : '🔑 Hasło'}
-                </button>
               </div>
             </div>
-          ))}
+            );
+          })}
         </div>
       )}
 

@@ -102,7 +102,7 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 	var isAdmin bool
 
 	err := h.DB.QueryRow(
-		`SELECT id, username, display_name, password_hash, is_admin FROM users WHERE username = $1`,
+		`SELECT id, username, display_name, password_hash, is_admin FROM users WHERE username = $1 AND deleted_at IS NULL`,
 		req.Username,
 	).Scan(&userID, &username, &displayName, &passwordHash, &isAdmin)
 	if err == sql.ErrNoRows {

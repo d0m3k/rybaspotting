@@ -3,6 +3,7 @@ package handlers
 import (
 	"database/sql"
 	"encoding/json"
+	"fmt"
 	"log"
 	"net/http"
 	"os"
@@ -189,13 +190,14 @@ func (h *AdminHandler) DeleteFish(w http.ResponseWriter, r *http.Request) {
 }
 
 type adminUserEntry struct {
-	ID          int       `json:"id"`
-	Username    string    `json:"username"`
-	DisplayName string    `json:"display_name"`
-	IsAdmin     bool      `json:"is_admin"`
-	Spots       int       `json:"spots"`
-	Collects    int       `json:"collects"`
-	CreatedAt   time.Time `json:"created_at"`
+	ID          int        `json:"id"`
+	Username    string     `json:"username"`
+	DisplayName string     `json:"display_name"`
+	IsAdmin     bool       `json:"is_admin"`
+	Spots       int        `json:"spots"`
+	Collects    int        `json:"collects"`
+	CreatedAt   time.Time  `json:"created_at"`
+	DeletedAt   *time.Time `json:"deleted_at"`
 }
 
 type setPasswordRequest struct {
@@ -206,7 +208,7 @@ type setPasswordRequest struct {
 // ListUsers returns all users with their spot and collect counts.
 func (h *AdminHandler) ListUsers(w http.ResponseWriter, r *http.Request) {
 	rows, err := h.DB.Query(
-		`SELECT u.id, u.username, COALESCE(u.display_name, ''), u.is_admin, u.created_at,
+		`SELECT u.id, u.username, COALESCE(u.display_name, ''), u.is_admin, u.created_at, u.deleted_at,
 		        COUNT(DISTINCT f.id)::int, COUNT(DISTINCT c.id)::int
 		 FROM users u
 		 LEFT JOIN fish f ON f.spotted_by = u.id
@@ -224,7 +226,7 @@ func (h *AdminHandler) ListUsers(w http.ResponseWriter, r *http.Request) {
 	result := []adminUserEntry{}
 	for rows.Next() {
 		var e adminUserEntry
-		if err := rows.Scan(&e.ID, &e.Username, &e.DisplayName, &e.IsAdmin, &e.CreatedAt,
+		if err := rows.Scan(&e.ID, &e.Username, &e.DisplayName, &e.IsAdmin, &e.CreatedAt, &e.DeletedAt,
 			&e.Spots, &e.Collects); err != nil {
 			log.Printf("[ADMIN] ListUsers scan error: %v", err)
 			continue
@@ -276,6 +278,105 @@ func (h *AdminHandler) SetPassword(w http.ResponseWriter, r *http.Request) {
 	log.Printf("[ADMIN] type=set_password admin_id=%d target=%s", adminID, req.Username)
 
 	writeJSON(w, http.StatusOK, map[string]string{"message": "password updated"})
+}
+
+// DeleteUser removes a user. Users with spotted fish are soft-deleted
+// (anonymised + blocked). Users with 0 spots are hard-deleted.
+func (h *AdminHandler) DeleteUser(w http.ResponseWriter, r *http.Request) {
+	username := r.URL.Query().Get("username")
+	if username == "" {
+		http.Error(w, `{"error":"username query parameter required"}`, http.StatusBadRequest)
+		return
+	}
+
+	// Don't allow deleting yourself
+	adminID, _ := r.Context().Value(middleware.ContextUserID).(int)
+	var adminName string
+	h.DB.QueryRow(`SELECT username FROM users WHERE id = $1`, adminID).Scan(&adminName)
+	if username == adminName {
+		http.Error(w, `{"error":"cannot delete yourself"}`, http.StatusForbidden)
+		return
+	}
+
+	// Check how many spots this user has
+	var spotCount int
+	h.DB.QueryRow(`SELECT COUNT(*) FROM fish WHERE spotted_by = (SELECT id FROM users WHERE username = $1)`, username).Scan(&spotCount)
+
+	if spotCount == 0 {
+		// Hard delete — no fish to preserve. Collections auto-deleted via ON DELETE CASCADE.
+		// Also remove avatar if exists.
+		var userID int
+		h.DB.QueryRow(`SELECT id FROM users WHERE username = $1`, username).Scan(&userID)
+
+		res, err := h.DB.Exec(`DELETE FROM users WHERE username = $1`, username)
+		if err != nil {
+			http.Error(w, `{"error":"internal error"}`, http.StatusInternalServerError)
+			return
+		}
+		rows, _ := res.RowsAffected()
+		if rows == 0 {
+			http.Error(w, `{"error":"user not found"}`, http.StatusNotFound)
+			return
+		}
+
+		// Clean up avatar
+		avatarPath := filepath.Join(h.Cfg.PhotoDir, "avatars", fmt.Sprintf("%d.jpg", userID))
+		os.Remove(avatarPath)
+
+		adminID, _ = r.Context().Value(middleware.ContextUserID).(int)
+		log.Printf("[ADMIN] type=hard_delete_user admin_id=%d target=%s spots=0", adminID, username)
+
+		writeJSON(w, http.StatusOK, map[string]string{"message": "user permanently deleted"})
+		return
+	}
+
+	// Soft delete — user has spotted fish, preserve their data.
+	res, err := h.DB.Exec(
+		`UPDATE users SET deleted_at = NOW(), display_name = 'usunięty' WHERE username = $1 AND deleted_at IS NULL`,
+		username,
+	)
+	if err != nil {
+		http.Error(w, `{"error":"internal error"}`, http.StatusInternalServerError)
+		return
+	}
+	rows, _ := res.RowsAffected()
+	if rows == 0 {
+		http.Error(w, `{"error":"user not found or already deleted"}`, http.StatusNotFound)
+		return
+	}
+
+	adminID, _ = r.Context().Value(middleware.ContextUserID).(int)
+	log.Printf("[ADMIN] type=soft_delete_user admin_id=%d target=%s spots=%d", adminID, username, spotCount)
+
+	writeJSON(w, http.StatusOK, map[string]string{"message": "user deleted (fish preserved)"})
+}
+
+// RestoreUser clears deleted_at, allowing the user to log in again.
+func (h *AdminHandler) RestoreUser(w http.ResponseWriter, r *http.Request) {
+	username := r.URL.Query().Get("username")
+	if username == "" {
+		http.Error(w, `{"error":"username query parameter required"}`, http.StatusBadRequest)
+		return
+	}
+
+	res, err := h.DB.Exec(
+		`UPDATE users SET deleted_at = NULL WHERE username = $1 AND deleted_at IS NOT NULL`,
+		username,
+	)
+	if err != nil {
+		http.Error(w, `{"error":"internal error"}`, http.StatusInternalServerError)
+		return
+	}
+	rows, _ := res.RowsAffected()
+	if rows == 0 {
+		http.Error(w, `{"error":"user not found or not deleted"}`, http.StatusNotFound)
+		return
+	}
+
+	adminID, _ := r.Context().Value(middleware.ContextUserID).(int)
+	log.Printf("[ADMIN] type=restore_user admin_id=%d target=%s", adminID, username)
+
+	writeJSON(w, http.StatusOK, map[string]string{"message": "user restored"})
 }
 
 // Stats returns admin dashboard stats.
