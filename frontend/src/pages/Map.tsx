@@ -135,7 +135,9 @@ export function MapPage({ onStatsChanged, userId }: { onStatsChanged?: () => voi
     try {
       await api.collect(fishId);
       if (onStatsChanged) onStatsChanged();
-      alert('Zebrane! 🐟');
+      // Refresh detail so the UI reflects the new collection
+      const detail = await api.getFish(fishId);
+      setFishDetail(detail);
     } catch (err: any) {
       alert(err.message);
     }
@@ -148,17 +150,8 @@ export function MapPage({ onStatsChanged, userId }: { onStatsChanged?: () => voi
 
       {selectedFish && (() => {
         const isOwnFish = userId != null && selectedFish.spotted_by === userId;
-        const alreadyCollected = fishDetail?.collectors?.some((c: any) => c.username === fishDetail?.spotter_name) === false
-          ? false
-          : fishDetail?.collectors?.some((c: any) => {
-              // Check if current user is in collectors by username or ID
-              return false; // We need to check by userId, but detail only has usernames
-            });
-        // Simpler: check if the current user's name appears in collectors
-        const currentUsername = localStorage.getItem('rybaspotting_auth');
-        let username = '';
-        try { username = JSON.parse(currentUsername || '{}').username || ''; } catch {}
-        const hasCollected = fishDetail?.collectors?.some((c: any) => c.username === username);
+        const currentUsername = loadAuth()?.username || '';
+        const hasCollected = fishDetail?.collectors?.some((c: any) => c.username === currentUsername) ?? false;
         const canCollect = !isOwnFish && !hasCollected && !detailLoading;
 
         return (
