@@ -225,6 +225,23 @@ export function ProfilePage({ auth, onLogout }: Props) {
       ) : (
         <div class="my-fish-list">{myCollected.map(f => renderFishItem(f, true, true, handleUncollect))}</div>
       )}
+
+      <footer class="profile-footer">
+        <p>
+          from{' '}
+          <a href="https://dom3k.pl" target="_blank" rel="noopener">dom3k</a>
+          {' '}with ❤️
+        </p>
+        <a
+          class="profile-build-hash"
+          href={`https://github.com/d0m3k/rybaspotting/commit/${__BUILD_HASH__}`}
+          target="_blank"
+          rel="noopener"
+          title="Zobacz commit na GitHub"
+        >
+          {__BUILD_HASH__}
+        </a>
+      </footer>
     </div>
   );
 }

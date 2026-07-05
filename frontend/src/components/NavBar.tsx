@@ -72,10 +72,6 @@ export function NavBar({ current, onNavigate, allowUpload, isAdmin }: NavBarProp
           </button>
         ))}
       </div>
-
-      <div class="nav-build-hash">
-        {__BUILD_HASH__}
-      </div>
     </nav>
   );
 }

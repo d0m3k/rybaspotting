@@ -280,17 +280,6 @@ html, body {
   font-weight: 500;
 }
 
-.nav-build-hash {
-  position: absolute;
-  top: -12px;
-  right: 4px;
-  font-size: 9px;
-  color: var(--text-muted);
-  background: var(--bg-secondary);
-  padding: 0 3px;
-  border-radius: 3px;
-}
-
 /* === Auth Pages === */
 .auth-page {
   display: flex;
@@ -930,6 +919,47 @@ html, body {
 .stats-fish-icon {
   font-size: 20px;
   margin-bottom: 4px;
+}
+
+/* === Profile footer === */
+.profile-footer {
+  text-align: center;
+  padding: 24px 16px 32px;
+  margin-top: 24px;
+  border-top: 1px solid var(--border);
+}
+
+.profile-footer p {
+  font-size: 13px;
+  color: var(--text-muted);
+  margin: 0 0 6px 0;
+}
+
+.profile-footer a {
+  color: var(--text-secondary);
+  text-decoration: none;
+  font-weight: 500;
+}
+
+.profile-footer a:hover {
+  color: #FF6B6B;
+}
+
+.profile-build-hash {
+  display: inline-block;
+  font-size: 11px;
+  font-family: monospace;
+  color: var(--text-muted);
+  text-decoration: none;
+  padding: 2px 8px;
+  border-radius: 4px;
+  background: var(--bg-highlight);
+  transition: background 0.2s, color 0.2s;
+}
+
+.profile-build-hash:hover {
+  background: var(--border);
+  color: var(--text);
 }
 
 .my-fish-list {
