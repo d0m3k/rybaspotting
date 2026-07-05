@@ -25,7 +25,17 @@ interface BeforeInstallPromptEvent extends Event {
 
 // --- Constants ---
 
-const DISMISS_KEY = 'pwa_install_dismissed';
+const DISMISS_KEY = 'pwa_install_dismissed_at';
+const DISMISS_DAYS = 14;
+
+function isDismissedRecently(): boolean {
+  const ts = localStorage.getItem(DISMISS_KEY);
+  if (!ts) return false;
+  const dismissedAt = parseInt(ts, 10);
+  if (isNaN(dismissedAt)) return false;
+  const now = Date.now();
+  return (now - dismissedAt) < DISMISS_DAYS * 24 * 60 * 60 * 1000;
+}
 
 // --- Component ---
 
@@ -38,8 +48,8 @@ export function InstallPrompt() {
     // Don't show anything if already installed as PWA
     if (isStandalone()) return;
 
-    // Don't show if user previously dismissed
-    if (localStorage.getItem(DISMISS_KEY) === 'true') {
+    // Don't show if user dismissed within the last 2 weeks
+    if (isDismissedRecently()) {
       setDismissed(true);
       return;
     }
@@ -80,7 +90,7 @@ export function InstallPrompt() {
   }
 
   function handleDismiss() {
-    localStorage.setItem(DISMISS_KEY, 'true');
+    localStorage.setItem(DISMISS_KEY, String(Date.now()));
     setShowBanner(null);
     setDismissed(true);
   }
