@@ -1,16 +1,6 @@
 import { useState, useEffect } from 'preact/hooks';
 import { api } from '../api';
-
-function AvatarImg({ userId, size = 28 }: { userId: number; size?: number }) {
-  return (
-    <img
-      src={`/api/users/avatar/${userId}`}
-      alt=""
-      style={`width:${size}px;height:${size}px;border-radius:50%;object-fit:cover;flex-shrink:0;background:var(--bg-highlight);`}
-      onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
-    />
-  );
-}
+import { Avatar } from '../components/Avatar';
 
 export function LeaderboardPage() {
   const [data, setData] = useState<{ top_spotters: any[]; top_collectors: any[] } | null>(null);
@@ -51,7 +41,7 @@ export function LeaderboardPage() {
               <tr key={e.username}>
                 <td><span class="rank-medal">{medal(i)}</span> {i + 1}</td>
                 <td style="display:flex;align-items:center;gap:8px;">
-                  <AvatarImg userId={e.user_id} size={26} />
+                  <Avatar userId={e.user_id} name={e.username} size={26} />
                   <strong>{e.username}</strong>
                 </td>
                 <td>{e.count}</td>
@@ -75,7 +65,7 @@ export function LeaderboardPage() {
               <tr key={e.username}>
                 <td><span class="rank-medal">{medal(i)}</span> {i + 1}</td>
                 <td style="display:flex;align-items:center;gap:8px;">
-                  <AvatarImg userId={e.user_id} size={26} />
+                  <Avatar userId={e.user_id} name={e.username} size={26} />
                   <strong>{e.username}</strong>
                 </td>
                 <td>{e.count}</td>
