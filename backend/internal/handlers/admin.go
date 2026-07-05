@@ -2,17 +2,21 @@ package handlers
 
 import (
 	"database/sql"
+	"encoding/json"
 	"log"
 	"net/http"
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
+	"time"
 
 	"rybaspotting/internal/config"
 	"rybaspotting/internal/middleware"
 	"rybaspotting/internal/models"
 
 	"github.com/go-chi/chi/v5"
+	"golang.org/x/crypto/bcrypt"
 )
 
 type AdminHandler struct {
@@ -182,6 +186,96 @@ func (h *AdminHandler) DeleteFish(w http.ResponseWriter, r *http.Request) {
 	log.Printf("[ADMIN] type=delete_fish admin_id=%d fish_id=%d filename=%q", adminID, id, filename)
 
 	writeJSON(w, http.StatusOK, map[string]string{"message": "fish deleted"})
+}
+
+type adminUserEntry struct {
+	ID          int       `json:"id"`
+	Username    string    `json:"username"`
+	DisplayName string    `json:"display_name"`
+	IsAdmin     bool      `json:"is_admin"`
+	Spots       int       `json:"spots"`
+	Collects    int       `json:"collects"`
+	CreatedAt   time.Time `json:"created_at"`
+}
+
+type setPasswordRequest struct {
+	Username    string `json:"username"`
+	NewPassword string `json:"new_password"`
+}
+
+// ListUsers returns all users with their spot and collect counts.
+func (h *AdminHandler) ListUsers(w http.ResponseWriter, r *http.Request) {
+	rows, err := h.DB.Query(
+		`SELECT u.id, u.username, COALESCE(u.display_name, ''), u.is_admin, u.created_at,
+		        COUNT(DISTINCT f.id)::int, COUNT(DISTINCT c.id)::int
+		 FROM users u
+		 LEFT JOIN fish f ON f.spotted_by = u.id
+		 LEFT JOIN collections c ON c.user_id = u.id
+		 GROUP BY u.id
+		 ORDER BY u.created_at DESC`,
+	)
+	if err != nil {
+		log.Printf("[ADMIN] ListUsers query error: %v", err)
+		http.Error(w, `{"error":"internal error"}`, http.StatusInternalServerError)
+		return
+	}
+	defer rows.Close()
+
+	result := []adminUserEntry{}
+	for rows.Next() {
+		var e adminUserEntry
+		if err := rows.Scan(&e.ID, &e.Username, &e.DisplayName, &e.IsAdmin, &e.CreatedAt,
+			&e.Spots, &e.Collects); err != nil {
+			log.Printf("[ADMIN] ListUsers scan error: %v", err)
+			continue
+		}
+		result = append(result, e)
+	}
+
+	writeJSON(w, http.StatusOK, result)
+}
+
+// SetPassword lets an admin reset a user's password.
+func (h *AdminHandler) SetPassword(w http.ResponseWriter, r *http.Request) {
+	var req setPasswordRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, `{"error":"invalid request body"}`, http.StatusBadRequest)
+		return
+	}
+
+	req.Username = strings.TrimSpace(req.Username)
+	req.NewPassword = strings.TrimSpace(req.NewPassword)
+	if req.Username == "" || req.NewPassword == "" {
+		http.Error(w, `{"error":"username and new_password required"}`, http.StatusBadRequest)
+		return
+	}
+	if len(req.NewPassword) < 4 {
+		http.Error(w, `{"error":"password must be at least 4 characters"}`, http.StatusBadRequest)
+		return
+	}
+
+	hash, err := bcrypt.GenerateFromPassword([]byte(req.NewPassword), bcrypt.DefaultCost)
+	if err != nil {
+		http.Error(w, `{"error":"internal error"}`, http.StatusInternalServerError)
+		return
+	}
+
+	res, err := h.DB.Exec(`UPDATE users SET password_hash = $1 WHERE username = $2`,
+		string(hash), req.Username)
+	if err != nil {
+		http.Error(w, `{"error":"internal error"}`, http.StatusInternalServerError)
+		return
+	}
+	rows, _ := res.RowsAffected()
+	if rows == 0 {
+		http.Error(w, `{"error":"user not found"}`, http.StatusNotFound)
+		return
+	}
+
+	adminID, _ := r.Context().Value(middleware.ContextUserID).(int)
+	log.Printf("[ADMIN] type=set_password admin_id=%d target=%s", adminID, req.Username)
+
+	writeJSON(w, http.StatusOK, map[string]string{"message": "password updated"})
 }
 
 // Stats returns admin dashboard stats.

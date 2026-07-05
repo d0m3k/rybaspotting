@@ -119,6 +119,17 @@ export const api = {
       method: 'POST',
     }),
 
+  // Admin — list users with stats
+  listUsers: () =>
+    request<any[]>('/api/admin/users'),
+
+  // Admin — set password for a user
+  setPassword: (username: string, newPassword: string) =>
+    request('/api/admin/set-password', {
+      method: 'POST',
+      body: JSON.stringify({ username, new_password: newPassword }),
+    }),
+
   // Admin — list all fish
   listAllFish: () =>
     request<any[]>('/api/admin/fish'),

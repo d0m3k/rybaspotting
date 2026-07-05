@@ -122,6 +122,8 @@ func main() {
 				r.Post("/admin/demote", adminH.DemoteUser)
 				r.Post("/admin/toggle-upload-mode", adminH.ToggleGalleryUpload)
 				r.Get("/admin/stats", adminH.Stats)
+				r.Get("/admin/users", adminH.ListUsers)
+				r.Post("/admin/set-password", adminH.SetPassword)
 				r.Get("/admin/fish", adminH.ListAllFish)
 				r.Delete("/admin/fish/{id}", adminH.DeleteFish)
 				r.Get("/admin/collections", adminH.ListCollections)

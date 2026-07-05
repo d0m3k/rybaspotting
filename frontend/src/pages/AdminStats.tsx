@@ -1,6 +1,16 @@
 import { useState, useEffect } from 'preact/hooks';
 import { api } from '../api';
 
+interface UserEntry {
+  id: number;
+  username: string;
+  display_name: string;
+  is_admin: boolean;
+  spots: number;
+  collects: number;
+  created_at: string;
+}
+
 interface FishEntry {
   id: number;
   photo_filename: string;
@@ -22,6 +32,8 @@ interface CollectionEntry {
   created_at: string;
 }
 
+type Tab = 'users' | 'fish' | 'collections';
+
 export function AdminStatsPage() {
   const [stats, setStats] = useState<{
     user_count: number;
@@ -29,18 +41,17 @@ export function AdminStatsPage() {
     photo_count: number;
     photo_size_mb: number;
   } | null>(null);
+  const [users, setUsers] = useState<UserEntry[]>([]);
   const [fishList, setFishList] = useState<FishEntry[]>([]);
   const [collections, setCollections] = useState<CollectionEntry[]>([]);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
-  const [tab, setTab] = useState<'fish' | 'collections'>('fish');
+  const [tab, setTab] = useState<Tab>('users');
 
-  // Promote/demote state
-  const [promoteUser, setPromoteUser] = useState('');
-  const [demoteUser, setDemoteUser] = useState('');
-  const [promoteMsg, setPromoteMsg] = useState('');
-  const [promoteErr, setPromoteErr] = useState('');
-  const [promoting, setPromoting] = useState(false);
+  // Action feedback
+  const [actionMsg, setActionMsg] = useState('');
+  const [actionErr, setActionErr] = useState('');
+  const [actingUser, setActingUser] = useState<string | null>(null);
 
   // Delete state
   const [deletingFish, setDeletingFish] = useState<number | null>(null);
@@ -52,12 +63,14 @@ export function AdminStatsPage() {
     setLoading(true);
     setError('');
     try {
-      const [s, fish, coll] = await Promise.all([
+      const [s, u, fish, coll] = await Promise.all([
         api.getAdminStats(),
+        api.listUsers(),
         api.listAllFish(),
         api.listCollections(),
       ]);
       setStats(s);
+      setUsers(u);
       setFishList(fish);
       setCollections(coll);
     } catch (err: any) {
@@ -67,33 +80,54 @@ export function AdminStatsPage() {
     }
   }
 
-  async function handlePromote(e: Event) {
-    e.preventDefault();
-    const name = promoteUser.trim();
-    if (!name) return;
-    setPromoteErr(''); setPromoteMsg(''); setPromoting(true);
-    try {
-      const res: any = await api.promoteUser(name);
-      setPromoteMsg(res.message);
-      setPromoteUser('');
-      loadData();
-    } catch (err: any) {
-      setPromoteErr(err.message);
-    } finally { setPromoting(false); }
+  function flash(msg: string, isError = false) {
+    if (isError) {
+      setActionErr(msg);
+      setActionMsg('');
+    } else {
+      setActionMsg(msg);
+      setActionErr('');
+    }
+    setActingUser(null);
+    setTimeout(() => { setActionMsg(''); setActionErr(''); }, 3000);
   }
 
-  async function handleDemote() {
-    const name = demoteUser.trim();
-    if (!name) return;
-    setPromoteErr(''); setPromoteMsg(''); setPromoting(true);
+  async function handlePromote(username: string) {
+    setActingUser(username);
     try {
-      const res: any = await api.demoteUser(name);
-      setPromoteMsg(res.message);
-      setDemoteUser('');
-      loadData();
+      await api.promoteUser(username);
+      setUsers(prev => prev.map(u => u.username === username ? { ...u, is_admin: true } : u));
+      flash(`✅ ${username} promoted to admin`);
     } catch (err: any) {
-      setPromoteErr(err.message);
-    } finally { setPromoting(false); }
+      flash(`❌ ${err.message}`, true);
+    }
+  }
+
+  async function handleDemote(username: string) {
+    setActingUser(username);
+    try {
+      await api.demoteUser(username);
+      setUsers(prev => prev.map(u => u.username === username ? { ...u, is_admin: false } : u));
+      flash(`⬇ ${username} demoted`);
+    } catch (err: any) {
+      flash(`❌ ${err.message}`, true);
+    }
+  }
+
+  async function handleSetPassword(username: string) {
+    const pw = prompt(`Nowe hasło dla użytkownika „${username}” (min. 4 znaki):`);
+    if (!pw) return;
+    if (pw.length < 4) {
+      flash('❌ Hasło musi mieć przynajmniej 4 znaki', true);
+      return;
+    }
+    setActingUser(username);
+    try {
+      await api.setPassword(username, pw);
+      flash(`🔑 Hasło dla ${username} zostało zmienione`);
+    } catch (err: any) {
+      flash(`❌ ${err.message}`, true);
+    }
   }
 
   async function handleDeleteFish(fishId: number) {
@@ -120,6 +154,12 @@ export function AdminStatsPage() {
   if (loading) return <div class="page"><p class="loading-text">Ładowanie…</p></div>;
   if (error) return <div class="page"><h2>🔑 Admin Panel</h2><p class="error-msg">{error}</p></div>;
 
+  const tabs: { key: Tab; label: string; count: number; emoji: string }[] = [
+    { key: 'users', label: 'Użytkownicy', count: users.length, emoji: '👥' },
+    { key: 'fish', label: 'Ryby', count: fishList.length, emoji: '🐟' },
+    { key: 'collections', label: 'Zebrania', count: collections.length, emoji: '🎣' },
+  ];
+
   return (
     <div class="page">
       <h2>🔑 Admin Panel</h2>
@@ -133,48 +173,88 @@ export function AdminStatsPage() {
         </div>
       )}
 
-      {/* Promote / Demote */}
-      <div style="margin-top:24px;padding:16px;background:#fff;border-radius:14px;border:1px solid #F0E0D0;">
-        <h3 style="margin-bottom:8px;">👑 Zarządzaj adminami</h3>
-        <div style="display:flex;gap:8px;align-items:flex-end;">
-          <div style="flex:1;">
-            <input class="input" type="text" placeholder="Nazwa użytkownika" value={promoteUser} onInput={(e: any) => setPromoteUser(e.target.value)} style="margin-bottom:0;" />
-          </div>
-          <button class="btn btn-primary" onClick={handlePromote} disabled={promoting} style="width:auto;padding:12px 16px;font-size:13px;">
-            {promoting ? '…' : 'Promuj'}
-          </button>
-        </div>
-        <div style="display:flex;gap:8px;margin-top:8px;align-items:flex-end;">
-          <div style="flex:1;">
-            <input class="input" type="text" placeholder="Nazwa użytkownika do degradacji" value={demoteUser} onInput={(e: any) => setDemoteUser(e.target.value)} style="margin-bottom:0;" />
-          </div>
-          <button class="btn" onClick={handleDemote} disabled={promoting} style="width:auto;padding:12px 16px;font-size:13px;background:#E74C3C;color:#fff;border:none;border-radius:12px;cursor:pointer;min-width:auto;">
-            {promoting ? '…' : 'Degraduj'}
-          </button>
-        </div>
-        {promoteErr && <p class="error-msg" style="margin-top:8px;">{promoteErr}</p>}
-        {promoteMsg && <p class="success-msg" style="margin-top:8px;">{promoteMsg}</p>}
-      </div>
+      {/* Flash messages */}
+      {(actionMsg || actionErr) && (
+        <p class={actionErr ? 'error-msg' : 'success-msg'} style="margin-top:12px;">
+          {actionMsg || actionErr}
+        </p>
+      )}
 
       {/* Tabs */}
-      <div style="display:flex;gap:4px;margin-top:24px;background:#F0E0D0;border-radius:10px;padding:3px;">
-        <button onClick={() => setTab('fish')} style={`flex:1;padding:8px;border:none;border-radius:8px;cursor:pointer;font-weight:600;font-size:13px;${tab === 'fish' ? 'background:#fff;color:#FF6B6B;box-shadow:0 1px 3px rgba(0,0,0,0.08);' : 'background:transparent;color:#999;'}`}>
-          🐟 Ryby ({fishList.length})
-        </button>
-        <button onClick={() => setTab('collections')} style={`flex:1;padding:8px;border:none;border-radius:8px;cursor:pointer;font-weight:600;font-size:13px;${tab === 'collections' ? 'background:#fff;color:#4ECDC4;box-shadow:0 1px 3px rgba(0,0,0,0.08);' : 'background:transparent;color:#999;'}`}>
-          🎣 Zebrania ({collections.length})
-        </button>
+      <div class="admin-tabs" style="display:flex;gap:4px;margin-top:20px;background:var(--bg-highlight);border-radius:10px;padding:3px;">
+        {tabs.map(t => (
+          <button
+            key={t.key}
+            onClick={() => setTab(t.key)}
+            class="admin-tab-btn"
+            style={`flex:1;padding:8px;border:none;border-radius:8px;cursor:pointer;font-weight:600;font-size:13px;${tab === t.key ? 'background:var(--bg-card);color:#FF6B6B;box-shadow:0 1px 3px rgba(0,0,0,0.08);' : 'background:transparent;color:var(--text-muted);'}`}
+          >
+            {t.emoji} {t.label} ({t.count})
+          </button>
+        ))}
       </div>
 
-      {/* Fish tab */}
+      {/* ── Users tab ── */}
+      {tab === 'users' && (
+        <div class="admin-user-list" style="margin-top:16px;display:flex;flex-direction:column;gap:10px;">
+          {users.map(user => (
+            <div key={user.id} class="admin-user-card" style="background:var(--bg-card);border-radius:14px;padding:14px;border:1px solid var(--border);">
+              <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
+                <div style="min-width:0;">
+                  <div style="display:flex;align-items:center;gap:6px;">
+                    <strong style="font-size:15px;">{user.display_name || user.username}</strong>
+                    {user.is_admin && <span style="background:#FF6B6B;color:#fff;font-size:10px;padding:1px 6px;border-radius:4px;font-weight:600;">ADMIN</span>}
+                  </div>
+                  <div style="font-size:12px;color:var(--text-muted);margin-top:2px;">@{user.username} · od {new Date(user.created_at).toLocaleDateString('pl-PL')}</div>
+                </div>
+                <div style="display:flex;gap:12px;text-align:center;">
+                  <div><div style="font-weight:700;font-size:16px;color:#FF6B6B;">{user.spots}</div><div style="font-size:11px;color:var(--text-muted);">spotów</div></div>
+                  <div><div style="font-weight:700;font-size:16px;color:#4ECDC4;">{user.collects}</div><div style="font-size:11px;color:var(--text-muted);">zebrań</div></div>
+                </div>
+              </div>
+              <div style="display:flex;gap:6px;margin-top:10px;flex-wrap:wrap;">
+                {user.is_admin ? (
+                  <button
+                    class="btn btn-sm btn-danger"
+                    onClick={() => handleDemote(user.username)}
+                    disabled={actingUser === user.username}
+                    style="font-size:12px;padding:5px 12px;background:#E74C3C;color:#fff;border:none;border-radius:8px;cursor:pointer;"
+                  >
+                    {actingUser === user.username ? '…' : '⬇ Degraduj'}
+                  </button>
+                ) : (
+                  <button
+                    class="btn btn-sm"
+                    onClick={() => handlePromote(user.username)}
+                    disabled={actingUser === user.username}
+                    style="font-size:12px;padding:5px 12px;background:linear-gradient(135deg,#FF6B6B,#FF8E72);color:#fff;border:none;border-radius:8px;cursor:pointer;"
+                  >
+                    {actingUser === user.username ? '…' : '👑 Promuj'}
+                  </button>
+                )}
+                <button
+                  class="btn btn-sm"
+                  onClick={() => handleSetPassword(user.username)}
+                  disabled={actingUser === user.username}
+                  style="font-size:12px;padding:5px 12px;background:var(--bg-input);color:var(--text-secondary);border:1px solid var(--border);border-radius:8px;cursor:pointer;"
+                >
+                  {actingUser === user.username ? '…' : '🔑 Hasło'}
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* ── Fish tab ── */}
       {tab === 'fish' && (
         <div style="margin-top:16px;display:flex;flex-direction:column;gap:12px;">
           {fishList.map(fish => (
-            <div key={fish.id} style="background:#fff;border-radius:14px;border:1px solid #F0E0D0;overflow:hidden;">
-              <div style="width:100%;aspect-ratio:4/3;background:#f5e8d8;overflow:hidden;">
+            <div key={fish.id} style="background:var(--bg-card);border-radius:14px;border:1px solid var(--border);overflow:hidden;">
+              <div style="width:100%;aspect-ratio:4/3;background:var(--bg-highlight);overflow:hidden;">
                 {fish.photo_filename ? (
                   <img src={`/api/photos/${fish.photo_filename}`} alt={`#${fish.id}`} style="width:100%;height:100%;object-fit:cover;" loading="lazy" />
-                ) : <div style="display:flex;align-items:center;justify-content:center;height:100%;color:#ccc;">Brak zdjęcia</div>}
+                ) : <div style="display:flex;align-items:center;justify-content:center;height:100%;color:var(--text-muted);">Brak zdjęcia</div>}
               </div>
               <div style="padding:12px;">
                 <div style="display:flex;justify-content:space-between;">
@@ -184,7 +264,7 @@ export function AdminStatsPage() {
                     {deletingFish === fish.id ? '…' : '🗑'}
                   </button>
                 </div>
-                <div style="font-size:12px;color:#999;margin-top:4px;">
+                <div style="font-size:12px;color:var(--text-muted);margin-top:4px;">
                   {fish.address_hint && <div>📍 {fish.address_hint}</div>}
                   {fish.latitude.toFixed(5)}, {fish.longitude.toFixed(5)} · {new Date(fish.created_at).toLocaleDateString('pl-PL')}
                 </div>
@@ -194,21 +274,21 @@ export function AdminStatsPage() {
         </div>
       )}
 
-      {/* Collections tab */}
+      {/* ── Collections tab ── */}
       {tab === 'collections' && (
         <div style="margin-top:16px;">
           {collections.length === 0 ? (
-            <p style="text-align:center;color:#999;padding:24px;">Brak zebrań.</p>
+            <p style="text-align:center;color:var(--text-muted);padding:24px;">Brak zebrań.</p>
           ) : (
             <table class="leaderboard-table" style="width:100%;">
               <thead><tr><th>ID</th><th>Zbieracz</th><th>Spotter</th><th>Data</th><th></th></tr></thead>
               <tbody>
                 {collections.map(c => (
                   <tr key={c.id}>
-                    <td style="font-size:12px;color:#999;">#{c.id}</td>
+                    <td style="font-size:12px;color:var(--text-muted);">#{c.id}</td>
                     <td><strong>{c.collector_name}</strong></td>
                     <td style="font-size:12px;">{c.spotter_name}</td>
-                    <td style="font-size:12px;color:#999;">{new Date(c.created_at).toLocaleDateString('pl-PL')}</td>
+                    <td style="font-size:12px;color:var(--text-muted);">{new Date(c.created_at).toLocaleDateString('pl-PL')}</td>
                     <td>
                       <button onClick={() => handleDeleteCollection(c.id)} disabled={deletingColl === c.id}
                         style="background:none;border:none;cursor:pointer;font-size:14px;">
