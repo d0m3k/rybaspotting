@@ -210,7 +210,7 @@ func (h *AdminHandler) Stats(w http.ResponseWriter, r *http.Request) {
 // ListCollections returns all collections for admin review.
 func (h *AdminHandler) ListCollections(w http.ResponseWriter, r *http.Request) {
 	rows, err := h.DB.Query(
-		`SELECT c.id, c.fish_id, cCOALESCE(NULLIF(u.display_name, ''), u.username), sCOALESCE(NULLIF(u.display_name, ''), u.username), f.latitude, f.longitude, c.created_at
+		`SELECT c.id, c.fish_id, COALESCE(NULLIF(cu.display_name, ''), cu.username), COALESCE(NULLIF(su.display_name, ''), su.username), f.latitude, f.longitude, c.created_at
 		 FROM collections c
 		 JOIN fish f ON f.id = c.fish_id
 		 JOIN users cu ON cu.id = c.user_id
