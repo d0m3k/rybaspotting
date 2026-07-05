@@ -418,9 +418,44 @@ html, body {
   color: #27AE60;
   font-size: 14px;
   margin-bottom: 8px;
-  padding: 8px 12px;
+  padding: 0;
+  background: none;
+}
+
+.success-box {
+  color: #27AE60;
+  font-size: 14px;
+  margin-bottom: 12px;
+  padding: 12px 14px;
   background: #F0FEF5;
   border-radius: 8px;
+  border: 2px solid #A3E4BC;
+  text-align: center;
+  animation: successPulse 0.6s ease-out;
+}
+
+@keyframes successPulse {
+  0% { transform: scale(0.9); opacity: 0; }
+  50% { transform: scale(1.03); }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+.success-box .success-msg {
+  font-weight: 600;
+  font-size: 16px;
+  margin-bottom: 4px;
+}
+
+.success-countdown {
+  color: #7F8C8D;
+  font-size: 13px;
+  margin: 4px 0 10px 0;
+}
+
+.success-box .btn {
+  width: 100%;
+  font-size: 15px;
+  padding: 10px;
 }
 
 /* === Map === */

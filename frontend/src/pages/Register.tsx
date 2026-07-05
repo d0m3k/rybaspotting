@@ -1,4 +1,4 @@
-import { useState } from 'preact/hooks';
+import { useState, useEffect, useRef } from 'preact/hooks';
 import { api } from '../api';
 
 import { Ryboczek } from '../components/Ryboczek';
@@ -15,6 +15,28 @@ export function RegisterPage({ onLogin }: Props) {
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [registered, setRegistered] = useState(false);
+  const [countdown, setCountdown] = useState(3);
+  const countdownRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  useEffect(() => {
+    if (!registered) return;
+    countdownRef.current = setInterval(() => {
+      setCountdown(c => {
+        if (c <= 1) return 0;
+        return c - 1;
+      });
+    }, 1000);
+    return () => {
+      if (countdownRef.current) clearInterval(countdownRef.current);
+    };
+  }, [registered]);
+
+  useEffect(() => {
+    if (countdown === 0) {
+      onLogin();
+    }
+  }, [countdown]);
 
   async function handleSubmit(e: Event) {
     e.preventDefault();
@@ -23,7 +45,8 @@ export function RegisterPage({ onLogin }: Props) {
     setLoading(true);
     try {
       const res: any = await api.register(username, password, displayName, captcha);
-      setMessage(res.message || 'Rejestracja udana! Możesz się teraz zalogować.');
+      setMessage(res.message || 'Rejestracja udana! Za chwilę zostaniesz przekierowany do logowania.');
+      setRegistered(true);
     } catch (err: any) {
       setError(err.message);
     } finally {
@@ -75,17 +98,31 @@ export function RegisterPage({ onLogin }: Props) {
             autocomplete="off"
           />
           {error && <p class="error-msg">{error}</p>}
-          {message && <p class="success-msg">{message}</p>}
-          <button class="btn btn-primary" type="submit" disabled={loading}>
-            {loading ? 'Rejestracja...' : 'Zarejestruj'}
-          </button>
+          {message && (
+            <div class="success-box">
+              <p class="success-msg">{message}</p>
+              {registered && countdown > 0 && (
+                <p class="success-countdown">Przekierowanie za {countdown}s…</p>
+              )}
+              <button class="btn btn-primary" type="button" onClick={onLogin}>
+                Zaloguj się teraz ➜
+              </button>
+            </div>
+          )}
+          {!registered && (
+            <button class="btn btn-primary" type="submit" disabled={loading}>
+              {loading ? 'Rejestracja...' : 'Zarejestruj'}
+            </button>
+          )}
         </form>
-        <p class="auth-link">
-          Masz już konto?{' '}
-          <span onClick={(e) => { e.preventDefault(); onLogin(); }}>
-            Zaloguj się
-          </span>
-        </p>
+        {!registered && (
+          <p class="auth-link">
+            Masz już konto?{' '}
+            <span onClick={(e) => { e.preventDefault(); onLogin(); }}>
+              Zaloguj się
+            </span>
+          </p>
+        )}
       </div>
     </div>
   );
