@@ -44,7 +44,7 @@ export function LeaderboardPage() {
               </tr>
             ))}
             {spotters.length === 0 && (
-              <tr><td colSpan={3} style="text-align:center;color:#999;padding:16px;">Brak danych</td></tr>
+              <tr><td colSpan={3} style="text-align:center;color:var(--text-muted);padding:16px;">Brak danych</td></tr>
             )}
           </tbody>
         </table>
@@ -65,7 +65,7 @@ export function LeaderboardPage() {
               </tr>
             ))}
             {collectors.length === 0 && (
-              <tr><td colSpan={3} style="text-align:center;color:#999;padding:16px;">Brak danych</td></tr>
+              <tr><td colSpan={3} style="text-align:center;color:var(--text-muted);padding:16px;">Brak danych</td></tr>
             )}
           </tbody>
         </table>

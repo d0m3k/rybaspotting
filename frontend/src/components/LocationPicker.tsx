@@ -75,13 +75,13 @@ export function LocationPicker({ initialLat, initialLng, onConfirm, onCancel, li
   const hasLimit = !!(limitCenter && limitRadiusM);
 
   return (
-    <div style={{ position: 'fixed', inset: 0, zIndex: 2000, background: '#fff', display: 'flex', flexDirection: 'column' }}>
+    <div style={{ position: 'fixed', inset: 0, zIndex: 2000, background: 'var(--bg-secondary)', display: 'flex', flexDirection: 'column' }}>
       {/* Header */}
-      <div style={{ padding: '12px 16px', background: '#FFF8F0', borderBottom: '2px solid rgba(255,107,107,0.15)', display: 'flex', alignItems: 'center', gap: '12px', flexShrink: 0 }}>
-        <button onClick={onCancel} style={{ border: 'none', background: 'none', fontSize: '24px', cursor: 'pointer', padding: '4px', color: '#2C3E50' }}>✕</button>
+      <div style={{ padding: '12px 16px', background: 'var(--top-bar-bg)', borderBottom: '2px solid rgba(255,107,107,0.15)', display: 'flex', alignItems: 'center', gap: '12px', flexShrink: 0 }}>
+        <button onClick={onCancel} style={{ border: 'none', background: 'none', fontSize: '24px', cursor: 'pointer', padding: '4px', color: 'var(--text)' }}>✕</button>
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontWeight: 600, fontSize: '14px' }}>Wybierz lokalizację</div>
-          <div style={{ fontSize: '12px', color: resolving ? '#999' : '#7F8C8D', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          <div style={{ fontWeight: 600, fontSize: '14px', color: 'var(--text)' }}>Wybierz lokalizację</div>
+          <div style={{ fontSize: '12px', color: 'var(--text-secondary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
             {resolving ? 'Sprawdzanie adresu…' : (address || 'Przewiń mapę, by ustawić punkt')}
             {hasLimit && <span style="color:#FF6B6B;font-weight:500;"> · max {limitRadiusM}m</span>}
           </div>
@@ -101,7 +101,7 @@ export function LocationPicker({ initialLat, initialLng, onConfirm, onCancel, li
       </div>
 
       {/* Coordinates */}
-      <div style={{ padding: '8px 16px', background: '#FFF0E0', textAlign: 'center', fontSize: '13px', color: '#555', fontFamily: 'monospace', flexShrink: 0 }}>
+      <div style={{ padding: '8px 16px', background: 'var(--bg-highlight)', textAlign: 'center', fontSize: '13px', color: 'var(--text-secondary)', fontFamily: 'monospace', flexShrink: 0 }}>
         {c.lat.toFixed(5)}, {c.lng.toFixed(5)}
       </div>
 

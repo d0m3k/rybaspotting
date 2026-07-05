@@ -73,7 +73,7 @@ export function NavBar({ current, onNavigate, allowUpload, isAdmin }: NavBarProp
         ))}
       </div>
 
-      <div style="position:absolute;top:-12px;right:4px;font-size:9px;color:#ccc;background:#FFF8F0;padding:0 3px;border-radius:3px;">
+      <div class="nav-build-hash">
         {__BUILD_HASH__}
       </div>
     </nav>

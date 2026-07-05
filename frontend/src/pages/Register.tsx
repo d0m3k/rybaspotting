@@ -85,7 +85,7 @@ export function RegisterPage({ onLogin }: Props) {
             value={displayName}
             onInput={(e: any) => setDisplayName(e.target.value)}
           />
-          <p style="font-size:13px;color:#7F8C8D;margin-bottom:8px;text-align:center;">
+          <p style="font-size:13px;color:var(--text-secondary);margin-bottom:8px;text-align:center;">
             🐟 Pytanie-ryba: <strong>„Ryby z czym?"</strong> (jedno słowo)
           </p>
           <input

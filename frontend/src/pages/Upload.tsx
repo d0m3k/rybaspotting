@@ -203,7 +203,7 @@ export function UploadPage({ onStatsChanged }: { onStatsChanged?: () => void }) 
               <p class="coords-display">
                 📍 {lat.toFixed(5)}, {lng.toFixed(5)}
                 {lat !== 0 && (
-                  <span style={{ fontSize: '11px', color: '#999' }}>
+                  <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
                     {' '}(z{lat !== parseFloat(manualLat || '0') ? ' mapy' : ' GPS/EXIF'})
                   </span>
                 )}
@@ -220,7 +220,7 @@ export function UploadPage({ onStatsChanged }: { onStatsChanged?: () => void }) 
 
             {gpsStatus === 'failed' && (
               <div style={{ marginBottom: '12px' }}>
-                <p style={{ fontSize: '13px', color: '#7F8C8D', marginBottom: '8px', textAlign: 'center' }}>
+                <p style={{ fontSize: '13px', color: 'var(--text-secondary)', marginBottom: '8px', textAlign: 'center' }}>
                   📍 Nie znaleziono lokalizacji w zdjęciu ani z GPS.
                 </p>
               </div>
@@ -236,7 +236,7 @@ export function UploadPage({ onStatsChanged }: { onStatsChanged?: () => void }) 
               </button>
               {gpsStatus !== 'ok' && (
                 <button
-                  style={{ flex: 1, fontSize: '14px', padding: '10px', background: '#fff', color: '#4ECDC4', border: '2px solid #4ECDC4', borderRadius: '12px', cursor: 'pointer', fontWeight: 600 }}
+                  style={{ flex: 1, fontSize: '14px', padding: '10px', background: 'var(--bg-card)', color: '#4ECDC4', border: '2px solid #4ECDC4', borderRadius: '12px', cursor: 'pointer', fontWeight: 600 }}
                   onClick={retryGPS}
                 >
                   📡 GPS

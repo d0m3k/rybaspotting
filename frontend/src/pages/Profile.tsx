@@ -124,17 +124,17 @@ export function ProfilePage({ auth, onLogout }: Props) {
           {allowDelete && onDelete && (
             <button
               onClick={(e) => { e.stopPropagation(); onDelete(f.id); }}
-              style="background:none;border:none;font-size:16px;cursor:pointer;padding:4px 8px;color:#ccc;flex-shrink:0;"
+              style="background:none;border:none;font-size:16px;cursor:pointer;padding:4px 8px;color:var(--text-muted);flex-shrink:0;"
               title="Usuń"
             >🗑</button>
           )}
         </div>
         {isExpanded && (
-          <div style="background:#fff;border-radius:14px;padding:12px;box-shadow:0 2px 12px rgba(0,0,0,0.08);margin-bottom:8px;">
+          <div style="background:var(--bg-card);border-radius:14px;padding:12px;box-shadow:0 2px 12px rgba(0,0,0,0.08);margin-bottom:8px;">
             <img src={`/api/photos/${f.photo_filename}`} alt="ryba" style="width:100%;max-height:300px;object-fit:cover;border-radius:10px;margin-bottom:8px;" />
             <p style="font-weight:600;font-size:15px;">{f.address_hint || `${f.latitude?.toFixed(5)}, ${f.longitude?.toFixed(5)}`}</p>
             {showCollectedAt && <p style="font-size:12px;color:#4ECDC4;margin-top:4px;">Zebrana: {new Date(f.collected_at).toLocaleDateString('pl-PL')}</p>}
-            <p style="font-size:12px;color:#999;margin-top:4px;">{new Date(f.created_at).toLocaleDateString('pl-PL')}</p>
+            <p style="font-size:12px;color:var(--text-muted);margin-top:4px;">{new Date(f.created_at).toLocaleDateString('pl-PL')}</p>
           </div>
         )}
       </div>
@@ -155,7 +155,7 @@ export function ProfilePage({ auth, onLogout }: Props) {
           {avatarUploading && <div class="avatar-uploading">⏳</div>}
         </div>
         {!avatarUrl && !avatarUploading && (
-          <div style="font-size:10px;color:#999;margin-top:-6px;margin-bottom:8px;cursor:pointer;" onClick={() => avatarInputRef.current?.click()}>
+          <div style="font-size:10px;color:var(--text-muted);margin-top:-6px;margin-bottom:8px;cursor:pointer;" onClick={() => avatarInputRef.current?.click()}>
             kliknij, by dodać zdjęcie
           </div>
         )}
@@ -208,7 +208,7 @@ export function ProfilePage({ auth, onLogout }: Props) {
 
       <h3>Moje spotted ryby ({mySpotted.length})</h3>
       {mySpotted.length === 0 ? (
-        <p style="text-align:center; color:#999; padding: 20px 0;">
+        <p style="text-align:center; color:var(--text-muted); padding: 20px 0;">
           Nie spottedowałeś jeszcze żadnej ryby. 🐟<br />
           <span style="font-size:13px;">Przejdź do zakładki <strong>Spot</strong> aby dodać pierwszą!</span>
         </p>
@@ -218,7 +218,7 @@ export function ProfilePage({ auth, onLogout }: Props) {
 
       <h3 style="margin-top:24px;">Zebrane ryby ({myCollected.length})</h3>
       {myCollected.length === 0 ? (
-        <p style="text-align:center; color:#999; padding: 20px 0;">
+        <p style="text-align:center; color:var(--text-muted); padding: 20px 0;">
           Nie zebrałeś jeszcze żadnej ryby. 🎣<br />
           <span style="font-size:13px;">Znajdź rybę na <strong>Mapie</strong> i kliknij Collect!</span>
         </p>

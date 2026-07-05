@@ -419,7 +419,7 @@ export function SpotPage({ onHideNav, onStatsChanged }: Props) {
                 </button>
               </div>
 
-              <div style={{ textAlign: 'center', margin: '4px 0', fontSize: '13px', color: '#7F8C8D' }}>
+              <div style={{ textAlign: 'center', margin: '4px 0', fontSize: '13px', color: 'var(--text-secondary)' }}>
                 {gpsStatus === 'loading' && <span>📡 Pobieranie GPS...</span>}
                 {gpsStatus === 'ok' && <span style={{ color: '#2ECC71' }}>📍 Lokalizacja GPS pobrana</span>}
                 {gpsStatus === 'failed' && <span style={{ color: '#E74C3C' }}>⚠️ Brak GPS (będziesz mógł wpisać ręcznie)</span>}
@@ -462,7 +462,7 @@ export function SpotPage({ onHideNav, onStatsChanged }: Props) {
             <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', textAlign: 'center' }}>
               <p>Aparat jest niedostępny lub brak uprawnień.</p>
               
-              <div style={{ textAlign: 'center', fontSize: '13px', color: '#7F8C8D' }}>
+              <div style={{ textAlign: 'center', fontSize: '13px', color: 'var(--text-secondary)' }}>
                 {gpsStatus === 'loading' && <span>📡 Pobieranie GPS...</span>}
                 {gpsStatus === 'ok' && <span style={{ color: '#2ECC71' }}>📍 Lokalizacja GPS pobrana</span>}
                 {gpsStatus === 'failed' && <span style={{ color: '#E74C3C' }}>⚠️ Brak GPS (będziesz mógł wpisać ręcznie)</span>}
@@ -550,7 +550,7 @@ export function SpotPage({ onHideNav, onStatsChanged }: Props) {
 
           {(useManualCoords || gpsStatus === 'failed') && (
             <div>
-              <p style={{ fontSize: '13px', color: '#7F8C8D', marginBottom: '8px', textAlign: 'center' }}>
+              <p style={{ fontSize: '13px', color: 'var(--text-secondary)', marginBottom: '8px', textAlign: 'center' }}>
                 📍 {gpsStatus === 'failed' ? 'Lokalizacja nie pobrana — wpisz ręcznie:' : 'Edytuj współrzędne:'}
               </p>
               <div class="coords-inputs">
@@ -564,7 +564,7 @@ export function SpotPage({ onHideNav, onStatsChanged }: Props) {
                   onClick={() => setShowMapPicker(true)}>
                   🗺️ Wybierz na mapie
                 </button>
-                <button style={{ flex: 1, fontSize: '14px', padding: '10px', background: '#fff', color: '#4ECDC4', border: '2px solid #4ECDC4', borderRadius: '12px', cursor: 'pointer', fontWeight: 600 }}
+                <button style={{ flex: 1, fontSize: '14px', padding: '10px', background: 'var(--bg-card)', color: '#4ECDC4', border: '2px solid #4ECDC4', borderRadius: '12px', cursor: 'pointer', fontWeight: 600 }}
                   onClick={() => {
                     navigator.geolocation.getCurrentPosition(
                       (pos) => { setLat(pos.coords.latitude); setLng(pos.coords.longitude); setGpsStatus('ok'); setUseManualCoords(false); },
