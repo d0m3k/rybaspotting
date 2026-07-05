@@ -1,6 +1,7 @@
 import { render } from 'preact';
 import { useRegisterSW } from 'virtual:pwa-register/preact';
 import { App } from './App';
+import { InstallPrompt } from './components/InstallPrompt';
 import './style.css';
 
 // Track whether we already had an active SW (to avoid reload on first install)
@@ -50,6 +51,7 @@ function Root() {
   return (
     <>
       <App />
+      <InstallPrompt />
       {needRefresh && (
         <div class="update-toast">
           <div class="update-toast-inner">

@@ -1249,6 +1249,104 @@ h3 {
   filter: drop-shadow(0 2px 3px rgba(0,0,0,0.45));
 }
 
+/* === PWA Install banner === */
+.install-banner {
+  position: fixed;
+  bottom: 90px;
+  left: 12px;
+  right: 12px;
+  z-index: 9998;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 12px 14px;
+  box-shadow: 0 4px 24px rgba(0,0,0,0.12);
+  animation: slideUp 0.4s ease-out;
+}
+
+.install-banner-ios {
+  flex-direction: column;
+  align-items: flex-start;
+}
+
+.install-banner-close {
+  position: absolute;
+  top: 6px;
+  right: 8px;
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  font-size: 16px;
+  padding: 4px 8px;
+  cursor: pointer;
+  line-height: 1;
+}
+
+.install-banner-close:active {
+  color: var(--text-secondary);
+}
+
+.install-banner-body {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1;
+  min-width: 0;
+}
+
+.install-banner-icon {
+  font-size: 32px;
+  flex-shrink: 0;
+  line-height: 1;
+}
+
+.install-banner-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 13px;
+  color: var(--text-secondary);
+  line-height: 1.4;
+}
+
+.install-banner-text strong {
+  font-size: 15px;
+  color: var(--text);
+}
+
+.install-banner-share-icon {
+  display: inline-block;
+  vertical-align: middle;
+  font-size: 14px;
+  border: 1.5px solid var(--text-secondary);
+  border-radius: 4px;
+  padding: 0 3px;
+  line-height: 1.2;
+  color: var(--text-secondary);
+}
+
+.install-banner-install {
+  flex-shrink: 0;
+  background: linear-gradient(135deg, #FF6B6B, #FF8E72);
+  color: #fff;
+  border: none;
+  border-radius: 10px;
+  padding: 10px 18px;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+  margin-right: 24px; /* space for close button */
+}
+
+.install-banner-install:active {
+  opacity: 0.85;
+  transform: scale(0.97);
+}
+
 /* === Update toast === */
 .update-toast {
   position: fixed;
