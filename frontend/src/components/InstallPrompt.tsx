@@ -108,7 +108,7 @@ export function InstallPrompt() {
           <span class="install-banner-icon">🐟</span>
           <div class="install-banner-text">
             <strong>Zainstaluj aplikację</strong>
-            <span>Szybki dostęp do mapy, nawet offline</span>
+            <span>Szybki dostęp do mapy — jak natywna apka</span>
           </div>
         </div>
         <button class="install-banner-install" onClick={handleInstall}>
