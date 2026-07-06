@@ -87,7 +87,7 @@ export function App() {
       return (
         <div class="app-container">
           <div class="app-content">
-            <RegisterPage onLogin={() => setPage('login')} />
+            <RegisterPage onLogin={() => setPage('login')} onOpenPrivacy={() => setPage('privacy')} />
           </div>
           <PrivacyBanner onOpenPolicy={() => setPage('privacy')} />
         </div>
@@ -106,7 +106,7 @@ export function App() {
     return (
       <div class="app-container">
         <div class="app-content">
-          <LoginPage onLogin={handleLogin} onRegister={() => setPage('register')} />
+          <LoginPage onLogin={handleLogin} onRegister={() => setPage('register')} onOpenPrivacy={() => setPage('privacy')} />
         </div>
         <PrivacyBanner onOpenPolicy={() => setPage('privacy')} />
       </div>

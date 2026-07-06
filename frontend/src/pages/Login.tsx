@@ -6,9 +6,10 @@ import { AuthState } from '../stores/auth';
 interface Props {
   onLogin: (state: AuthState) => void;
   onRegister: () => void;
+  onOpenPrivacy: () => void;
 }
 
-export function LoginPage({ onLogin, onRegister }: Props) {
+export function LoginPage({ onLogin, onRegister, onOpenPrivacy }: Props) {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -103,6 +104,11 @@ export function LoginPage({ onLogin, onRegister }: Props) {
           <p class="welcome-footer">
             🗺️ Przeglądaj mapę, 📸 spotuj nowe ryby, 🎣 zbieraj istniejące
             i 🏆 wspinaj się w rankingu!
+          </p>
+          <p style="text-align:center;margin-top:10px;font-size:12px;">
+            <span class="privacy-banner-link" onClick={onOpenPrivacy}>
+              Polityka Prywatności
+            </span>
           </p>
         </div>
       </div>

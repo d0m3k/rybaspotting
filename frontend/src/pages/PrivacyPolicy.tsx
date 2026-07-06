@@ -137,11 +137,14 @@ export function PrivacyPolicyPage({ onBack }: Props) {
         </p>
         <ul>
           <li>
-            <strong>DNS i proxy (ryby.dom3k.pl)</strong> — ruch HTTPS do
-            aplikacji przechodzi przez sieć Cloudflare, która działa jako
-            reverse proxy. Cloudflare widzi adresy IP użytkowników oraz
-            zaszyfrowany ruch HTTPS (nie widzi treści). Ma to na celu ochronę
-            przed atakami DDoS i przyspieszenie dostarczania treści (CDN).
+            <strong>DNS i proxy (ryby.dom3k.pl)</strong> — domena używa
+            proxy Cloudflare (pomarańczowa chmurka). Cloudflare terminuje TLS
+            na swoim brzegu sieci, a następnie przekazuje odszyfrowany ruch
+            przez tunel (cloudflared) do serwera. <strong>Oznacza to, że
+            Cloudflare widzi pełną treść ruchu HTTP</strong> — w tym tokeny
+            JWT, nazwy użytkowników, dane ryb i przesyłane zdjęcia — jako
+            reverse proxy, niezbędny do świadczenia usługi CDN i ochrony DDoS.
+            Cloudflare przetwarza te dane jako podmiot przetwarzający.
           </li>
           <li>
             <strong>Cloudflare Tunnel (shell.dom3k.pl)</strong> — używany

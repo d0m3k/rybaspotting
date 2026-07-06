@@ -5,9 +5,10 @@ import { Ryboczek } from '../components/Ryboczek';
 
 interface Props {
   onLogin: () => void;
+  onOpenPrivacy: () => void;
 }
 
-export function RegisterPage({ onLogin }: Props) {
+export function RegisterPage({ onLogin, onOpenPrivacy }: Props) {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [displayName, setDisplayName] = useState('');
@@ -127,6 +128,11 @@ export function RegisterPage({ onLogin }: Props) {
             </span>
           </p>
         )}
+        <p style="text-align:center;font-size:12px;margin-top:12px;">
+          <span class="privacy-banner-link" onClick={onOpenPrivacy}>
+            Polityka Prywatności
+          </span>
+        </p>
       </div>
     </div>
   );
