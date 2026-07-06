@@ -17,6 +17,13 @@ type Config struct {
 	MaxPhotoWidth      int
 	CaptchaAnswers     []string
 
+	// R2 / S3-compatible storage (optional — falls back to local disk if empty)
+	R2Endpoint       string
+	R2AccessKeyID    string
+	R2SecretAccessKey string
+	R2Bucket         string
+	R2PublicURL      string
+
 	mu                   sync.RWMutex
 	allowGalleryUpload   bool
 }
@@ -32,6 +39,13 @@ func Load() *Config {
 		MaxPhotoWidth:      getEnvInt("MAX_PHOTO_WIDTH", 1200),
 		CaptchaAnswers:     getEnvList("CAPTCHA_ANSWERS", []string{"dupom", "dupą", "dupa"}),
 		allowGalleryUpload: getEnvBool("ALLOW_GALLERY_UPLOAD", false),
+
+		// R2 / S3-compatible storage (all empty = use local disk)
+		R2Endpoint:        getEnv("R2_ENDPOINT", ""),
+		R2AccessKeyID:     getEnv("R2_ACCESS_KEY_ID", ""),
+		R2SecretAccessKey: getEnv("R2_SECRET_ACCESS_KEY", ""),
+		R2Bucket:          getEnv("R2_BUCKET", ""),
+		R2PublicURL:       getEnv("R2_PUBLIC_URL", ""),
 	}
 	return cfg
 }

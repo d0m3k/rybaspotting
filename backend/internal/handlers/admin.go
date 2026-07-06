@@ -3,11 +3,8 @@ package handlers
 import (
 	"database/sql"
 	"encoding/json"
-	"fmt"
 	"log"
 	"net/http"
-	"os"
-	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -15,14 +12,16 @@ import (
 	"rybaspotting/internal/config"
 	"rybaspotting/internal/middleware"
 	"rybaspotting/internal/models"
+	"rybaspotting/internal/storage"
 
 	"github.com/go-chi/chi/v5"
 	"golang.org/x/crypto/bcrypt"
 )
 
 type AdminHandler struct {
-	DB  *sql.DB
-	Cfg *config.Config
+	DB      *sql.DB
+	Cfg     *config.Config
+	Storage storage.Storage
 }
 
 type adminStatsResponse struct {
@@ -164,22 +163,14 @@ func (h *AdminHandler) DeleteFish(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Delete photo files from disk
+	// Delete photo files from storage
 	if filename != "" {
-		ext := filepath.Ext(filename)
-		baseName := filename[:len(filename)-len(ext)]
-
-		// Full photo
-		photoPath := filepath.Join(h.Cfg.PhotoDir, filename)
-		if err := os.Remove(photoPath); err != nil && !os.IsNotExist(err) {
-			log.Printf("[ADMIN] DeleteFish: failed to remove photo %s: %v", photoPath, err)
+		if err := h.Storage.Delete(filename); err != nil {
+			log.Printf("[ADMIN] DeleteFish: failed to delete photo %s: %v", filename, err)
 		}
-
-		// Thumbnail (filename_thumb.ext)
-		thumbFilename := baseName + "_thumb" + ext
-		thumbPath := filepath.Join(h.Cfg.PhotoDir, thumbFilename)
-		if err := os.Remove(thumbPath); err != nil && !os.IsNotExist(err) {
-			log.Printf("[ADMIN] DeleteFish: failed to remove thumbnail %s: %v", thumbPath, err)
+		thumbFilename := storage.ThumbFilename(filename)
+		if err := h.Storage.Delete(thumbFilename); err != nil {
+			log.Printf("[ADMIN] DeleteFish: failed to delete thumbnail %s: %v", thumbFilename, err)
 		}
 	}
 
@@ -320,8 +311,9 @@ func (h *AdminHandler) DeleteUser(w http.ResponseWriter, r *http.Request) {
 		}
 
 		// Clean up avatar
-		avatarPath := filepath.Join(h.Cfg.PhotoDir, "avatars", fmt.Sprintf("%d.jpg", userID))
-		os.Remove(avatarPath)
+		if err := h.Storage.Delete(storage.AvatarKey(userID)); err != nil {
+			log.Printf("[ADMIN] DeleteUser: failed to delete avatar for %d: %v", userID, err)
+		}
 
 		adminID, _ = r.Context().Value(middleware.ContextUserID).(int)
 		log.Printf("[ADMIN] type=hard_delete_user admin_id=%d target=%s spots=0", adminID, username)
@@ -386,18 +378,15 @@ func (h *AdminHandler) Stats(w http.ResponseWriter, r *http.Request) {
 	h.DB.QueryRow(`SELECT COUNT(*) FROM users`).Scan(&resp.UserCount)
 	h.DB.QueryRow(`SELECT COUNT(*) FROM fish`).Scan(&resp.FishCount)
 
-	if ents, err := os.ReadDir(h.Cfg.PhotoDir); err == nil {
-		for _, e := range ents {
-			if e.IsDir() {
-				continue
-			}
-			resp.PhotoCount++
-			if info, err := e.Info(); err == nil {
-				resp.PhotoSizeMB += info.Size()
-			}
-		}
+	// Count photos and total size from storage
+	count, countErr := h.Storage.Count()
+	size, sizeErr := h.Storage.TotalSize()
+	if countErr == nil {
+		resp.PhotoCount = count
 	}
-	resp.PhotoSizeMB = resp.PhotoSizeMB / (1024 * 1024)
+	if sizeErr == nil {
+		resp.PhotoSizeMB = size / (1024 * 1024)
+	}
 
 	writeJSON(w, http.StatusOK, resp)
 }

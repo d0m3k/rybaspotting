@@ -110,7 +110,7 @@ export function ProfilePage({ auth, onLogout }: Props) {
       <div key={f.id + (showCollectedAt ? '-c' : '-s')} style="display: contents;">
         <div class="my-fish-item" style="cursor:pointer;position:relative;">
           <div style="display:flex;gap:12px;align-items:center;flex:1;" onClick={() => setExpandedFish(isExpanded ? null : f)}>
-            <img src={`/api/photos/${f.photo_filename}`} alt="ryba" class="mini-thumb" />
+            <img src={f.photo_url || `/api/photos/${f.photo_filename}`} alt="ryba" class="mini-thumb" />
             <div style="flex:1;">
               <p style="font-weight:500;font-size:14px;">
                 {f.address_hint ? `📍 ${f.address_hint}` : `📍 ${f.latitude?.toFixed(4)}, ${f.longitude?.toFixed(4)}`}
@@ -131,7 +131,7 @@ export function ProfilePage({ auth, onLogout }: Props) {
         </div>
         {isExpanded && (
           <div style="background:var(--bg-card);border-radius:14px;padding:12px;box-shadow:0 2px 12px rgba(0,0,0,0.08);margin-bottom:8px;">
-            <img src={`/api/photos/${f.photo_filename}`} alt="ryba" style="width:100%;max-height:300px;object-fit:cover;border-radius:10px;margin-bottom:8px;" />
+            <img src={f.photo_url || `/api/photos/${f.photo_filename}`} alt="ryba" style="width:100%;max-height:300px;object-fit:cover;border-radius:10px;margin-bottom:8px;" />
             <p style="font-weight:600;font-size:15px;">{f.address_hint || `${f.latitude?.toFixed(5)}, ${f.longitude?.toFixed(5)}`}</p>
             {showCollectedAt && <p style="font-size:12px;color:#4ECDC4;margin-top:4px;">Zebrana: {new Date(f.collected_at).toLocaleDateString('pl-PL')}</p>}
             <p style="font-size:12px;color:var(--text-muted);margin-top:4px;">{new Date(f.created_at).toLocaleDateString('pl-PL')}</p>

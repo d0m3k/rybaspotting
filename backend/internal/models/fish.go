@@ -5,6 +5,7 @@ import "time"
 type Fish struct {
 	ID            int       `json:"id"`
 	PhotoFilename string    `json:"photo_filename"`
+	PhotoURL      string    `json:"photo_url,omitempty"`
 	Latitude      float64   `json:"latitude"`
 	Longitude     float64   `json:"longitude"`
 	AddressHint   string    `json:"address_hint"`

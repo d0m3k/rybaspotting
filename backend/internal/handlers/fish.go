@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"bytes"
 	"database/sql"
 	"fmt"
 	"log"
@@ -15,14 +16,16 @@ import (
 	"rybaspotting/internal/config"
 	"rybaspotting/internal/middleware"
 	"rybaspotting/internal/models"
+	"rybaspotting/internal/storage"
 
 	"github.com/disintegration/imaging"
 	"github.com/go-chi/chi/v5"
 )
 
 type FishHandler struct {
-	DB  *sql.DB
-	Cfg *config.Config
+	DB      *sql.DB
+	Cfg     *config.Config
+	Storage storage.Storage
 }
 
 func (h *FishHandler) Create(w http.ResponseWriter, r *http.Request) {
@@ -62,26 +65,22 @@ func (h *FishHandler) Create(w http.ResponseWriter, r *http.Request) {
 	}
 	defer file.Close()
 
-	// Ensure photo directory exists
-	if err := os.MkdirAll(h.Cfg.PhotoDir, 0755); err != nil {
-		http.Error(w, `{"error":"internal error"}`, http.StatusInternalServerError)
-		return
-	}
-
-	// Decode, downscale, and save photo
+	// Decode the image
 	src, err := imaging.Decode(file, imaging.AutoOrientation(true))
 	if err != nil {
 		http.Error(w, `{"error":"invalid image file"}`, http.StatusBadRequest)
 		return
 	}
 
-	// Downscale to MaxPhotoWidth (Resize handles height=0 as "auto")
-	resized := imaging.Resize(src, h.Cfg.MaxPhotoWidth, 0, imaging.Lanczos)
+	// Determine file extension
+	ext := ".jpg"
+	if header != nil && header.Filename != "" {
+		if e := filepath.Ext(header.Filename); e != "" {
+			ext = e
+		}
+	}
 
-	// Generate thumbnail (200px wide)
-	thumb := imaging.Resize(src, 200, 0, imaging.Lanczos)
-
-	// Insert fish row to get ID
+	// Insert fish row to get ID (with empty filename first)
 	var fishID int
 	err = h.DB.QueryRow(
 		`INSERT INTO fish (photo_filename, latitude, longitude, address_hint, spotted_by)
@@ -93,7 +92,7 @@ func (h *FishHandler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// If anything fails from here on, clean up the orphan fish row.
+	// Clean up on any subsequent failure
 	ok := false
 	defer func() {
 		if !ok {
@@ -101,43 +100,39 @@ func (h *FishHandler) Create(w http.ResponseWriter, r *http.Request) {
 		}
 	}()
 
-	// Save files named by fish ID
-	ext := ".jpg"
-	if header != nil && header.Filename != "" {
-		if e := filepath.Ext(header.Filename); e != "" {
-			ext = e
-		}
-	}
-
 	filename := fmt.Sprintf("%d%s", fishID, ext)
-	thumbFilename := fmt.Sprintf("%d_thumb%s", fishID, ext)
 
-	photoPath := filepath.Join(h.Cfg.PhotoDir, filename)
-	thumbPath := filepath.Join(h.Cfg.PhotoDir, thumbFilename)
+	// Resize and encode via storage backend
+	resized := imaging.Resize(src, h.Cfg.MaxPhotoWidth, 0, imaging.Lanczos)
+	thumb := imaging.Resize(src, 200, 0, imaging.Lanczos)
 
-	// Save full photo
-	fullOut, err := os.Create(photoPath)
+	// Full photo
+	var fullBuf bytes.Buffer
+	if err := imaging.Encode(&fullBuf, resized, imaging.JPEG, imaging.JPEGQuality(85)); err != nil {
+		http.Error(w, `{"error":"internal error"}`, http.StatusInternalServerError)
+		return
+	}
+	result, err := h.Storage.Store(filename, fullBuf.Bytes(), "image/jpeg")
 	if err != nil {
-		http.Error(w, `{"error":"internal error"}`, http.StatusInternalServerError)
-		return
-	}
-	defer fullOut.Close()
-	if err := imaging.Encode(fullOut, resized, imaging.JPEG, imaging.JPEGQuality(85)); err != nil {
+		log.Printf("[FISH] ERROR storing full photo for id=%d: %v", fishID, err)
 		http.Error(w, `{"error":"internal error"}`, http.StatusInternalServerError)
 		return
 	}
 
-	// Save thumbnail
-	thumbOut, err := os.Create(thumbPath)
-	if err != nil {
+	// Thumbnail
+	thumbFilename := storage.ThumbFilename(filename)
+	var thumbBuf bytes.Buffer
+	if err := imaging.Encode(&thumbBuf, thumb, imaging.JPEG, imaging.JPEGQuality(80)); err != nil {
 		http.Error(w, `{"error":"internal error"}`, http.StatusInternalServerError)
 		return
 	}
-	defer thumbOut.Close()
-	if err := imaging.Encode(thumbOut, thumb, imaging.JPEG, imaging.JPEGQuality(80)); err != nil {
+	if _, err := h.Storage.Store(thumbFilename, thumbBuf.Bytes(), "image/jpeg"); err != nil {
+		log.Printf("[FISH] ERROR storing thumbnail for id=%d: %v", fishID, err)
 		http.Error(w, `{"error":"internal error"}`, http.StatusInternalServerError)
 		return
 	}
+
+	photoURL := result.URL
 
 	// Update photo_filename in DB
 	if _, err := h.DB.Exec(`UPDATE fish SET photo_filename = $1 WHERE id = $2`, filename, fishID); err != nil {
@@ -146,12 +141,13 @@ func (h *FishHandler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	ok = true // everything succeeded, don't clean up
+	ok = true // everything succeeded
 
 	// Return created fish
 	f := models.Fish{
 		ID:            fishID,
 		PhotoFilename: filename,
+		PhotoURL:      photoURL,
 		Latitude:      lat,
 		Longitude:     lng,
 		AddressHint:   addressHint,
@@ -201,6 +197,9 @@ func (h *FishHandler) List(w http.ResponseWriter, r *http.Request) {
 			log.Printf("[FISH] List skipping fish %d with NaN coords", f.ID)
 			continue
 		}
+		if f.PhotoFilename != "" {
+			f.PhotoURL = h.Storage.PublicURL(f.PhotoFilename)
+		}
 		fishList = append(fishList, f)
 	}
 	if err := rows.Err(); err != nil {
@@ -234,6 +233,9 @@ func (h *FishHandler) Get(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		http.Error(w, `{"error":"internal error"}`, http.StatusInternalServerError)
 		return
+	}
+	if f.PhotoFilename != "" {
+		f.PhotoURL = h.Storage.PublicURL(f.PhotoFilename)
 	}
 
 	// Get collectors
@@ -283,9 +285,6 @@ func (h *FishHandler) Nearby(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// Haversine formula for distance calculation (no PostGIS extensions needed)
-	// Approx: 1° lat = 111320m, 1° lng = 111320*cos(lat) at given latitude
-	// Bounding box pre-filter for performance, then haversine in SQL
 	rows, err := h.DB.Query(
 		`SELECT f.id, f.photo_filename, f.latitude, f.longitude, f.address_hint,
 		        f.spotted_by, COALESCE(NULLIF(u.display_name, ''), u.username), f.created_at,
@@ -321,6 +320,9 @@ func (h *FishHandler) Nearby(w http.ResponseWriter, r *http.Request) {
 			continue
 		}
 		nf.DistanceMeters = math.Round(nf.DistanceMeters*100) / 100
+		if nf.PhotoFilename != "" {
+			nf.PhotoURL = h.Storage.PublicURL(nf.PhotoFilename)
+		}
 		nearby = append(nearby, nf)
 	}
 
@@ -363,28 +365,29 @@ func (h *FishHandler) DeleteMyFish(w http.ResponseWriter, r *http.Request) {
 	var filename string
 	h.DB.QueryRow(`SELECT photo_filename FROM fish WHERE id = $1`, id).Scan(&filename)
 
-	// Delete from DB
+	// Delete from DB (collections cascade)
 	_, err = h.DB.Exec(`DELETE FROM fish WHERE id = $1`, id)
 	if err != nil {
 		http.Error(w, `{"error":"internal error"}`, http.StatusInternalServerError)
 		return
 	}
 
-	// Delete photo files
+	// Delete photo files from storage
 	if filename != "" {
-		ext := filepath.Ext(filename)
-		baseName := filename[:len(filename)-len(ext)]
-		photoPath := filepath.Join(h.Cfg.PhotoDir, filename)
-		thumbPath := filepath.Join(h.Cfg.PhotoDir, baseName+"_thumb"+ext)
-		os.Remove(photoPath)
-		os.Remove(thumbPath)
+		if err := h.Storage.Delete(filename); err != nil {
+			log.Printf("[FISH] DeleteMyFish: failed to delete %s: %v", filename, err)
+		}
+		thumbFilename := storage.ThumbFilename(filename)
+		if err := h.Storage.Delete(thumbFilename); err != nil {
+			log.Printf("[FISH] DeleteMyFish: failed to delete thumbnail %s: %v", thumbFilename, err)
+		}
 	}
 
 	log.Printf("[FISH] type=deleted_by_owner fish_id=%d user_id=%d", id, userID)
 	writeJSON(w, http.StatusOK, map[string]string{"message": "fish deleted"})
 }
 
-// ServePhoto serves a photo or thumbnail from the photo directory.
+// ServePhoto serves a photo or thumbnail — redirects to the storage URL.
 func (h *FishHandler) ServePhoto(w http.ResponseWriter, r *http.Request) {
 	filename := chi.URLParam(r, "filename")
 	if filename == "" || strings.Contains(filename, "..") || strings.Contains(filename, "/") {
@@ -392,6 +395,14 @@ func (h *FishHandler) ServePhoto(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// If we have a public URL (R2), redirect instead of serving ourselves
+	publicURL := h.Storage.PublicURL(filename)
+	if publicURL != "" && !strings.HasPrefix(publicURL, "/api/photos/") {
+		http.Redirect(w, r, publicURL, http.StatusFound)
+		return
+	}
+
+	// Fallback: serve from local disk
 	photoPath := filepath.Join(h.Cfg.PhotoDir, filename)
 	if _, err := os.Stat(photoPath); os.IsNotExist(err) {
 		http.Error(w, "not found", http.StatusNotFound)
@@ -402,4 +413,3 @@ func (h *FishHandler) ServePhoto(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Cache-Control", "public, max-age=86400")
 	http.ServeFile(w, r, photoPath)
 }
-

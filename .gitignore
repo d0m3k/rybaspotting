@@ -18,6 +18,9 @@ node_modules/
 .vscode/
 .idea/
 
+# Backup script (contains deployment-specific config, read from .env on the instance)
+scripts/backup.sh
+
 # OS
 .DS_Store
 Thumbs.db

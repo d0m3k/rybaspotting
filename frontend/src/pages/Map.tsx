@@ -200,7 +200,7 @@ export function MapPage({ onStatsChanged, userId, username }: { onStatsChanged?:
         <div class="bottom-sheet">
           <button class="close-btn" onClick={() => { setSelectedFish(null); setFishDetail(null); }}>✕</button>
           <img
-            src={`/api/photos/${selectedFish.photo_filename}`}
+            src={selectedFish.photo_url || `/api/photos/${selectedFish.photo_filename}`}
             alt="Ryba"
             class="fish-preview"
           />

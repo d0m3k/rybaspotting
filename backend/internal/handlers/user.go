@@ -3,25 +3,24 @@ package handlers
 import (
 	"database/sql"
 	"encoding/json"
-	"fmt"
 	"log"
 	"net/http"
-	"os"
-	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
 
 	"rybaspotting/internal/config"
 	"rybaspotting/internal/middleware"
+	"rybaspotting/internal/storage"
 
 	"github.com/disintegration/imaging"
 	"github.com/go-chi/chi/v5"
 )
 
 type UserHandler struct {
-	DB  *sql.DB
-	Cfg *config.Config
+	DB      *sql.DB
+	Cfg     *config.Config
+	Storage storage.Storage
 }
 
 type userStatsResponse struct {
@@ -37,6 +36,7 @@ type userStatsResponse struct {
 type collectedFishResponse struct {
 	ID            int       `json:"id"`
 	PhotoFilename string    `json:"photo_filename"`
+	PhotoURL      string    `json:"photo_url,omitempty"`
 	Latitude      float64   `json:"latitude"`
 	Longitude     float64   `json:"longitude"`
 	AddressHint   string    `json:"address_hint"`
@@ -71,11 +71,8 @@ func (h *UserHandler) Me(w http.ResponseWriter, r *http.Request) {
 		`SELECT COUNT(*) FROM collections WHERE user_id = $1`, userID,
 	).Scan(&resp.Collected)
 
-	// Check avatar
-	avatarPath := filepath.Join(h.Cfg.PhotoDir, "avatars", fmt.Sprintf("%d.jpg", userID))
-	if _, err := os.Stat(avatarPath); err == nil {
-		resp.HasAvatar = true
-	}
+	// Check avatar via storage
+	resp.HasAvatar = h.Storage.Exists(storage.AvatarKey(userID))
 
 	writeJSON(w, http.StatusOK, resp)
 }
@@ -107,6 +104,9 @@ func (h *UserHandler) MyCollections(w http.ResponseWriter, r *http.Request) {
 			&f.AddressHint, &f.SpotterName, &f.CreatedAt, &f.CollectedAt); err != nil {
 			continue
 		}
+		if f.PhotoFilename != "" {
+			f.PhotoURL = h.Storage.PublicURL(f.PhotoFilename)
+		}
 		result = append(result, f)
 	}
 
@@ -129,38 +129,22 @@ func (h *UserHandler) UploadAvatar(w http.ResponseWriter, r *http.Request) {
 	}
 	defer file.Close()
 
-	// Ensure avatars directory exists
-	avatarDir := filepath.Join(h.Cfg.PhotoDir, "avatars")
-	if err := os.MkdirAll(avatarDir, 0755); err != nil {
-		http.Error(w, `{"error":"internal error"}`, http.StatusInternalServerError)
-		return
-	}
-
-	// Decode, crop to 200x200 square, save as JPEG
+	// Decode, crop to 200x200 square, upload via storage
 	src, err := imaging.Decode(file, imaging.AutoOrientation(true))
 	if err != nil {
 		http.Error(w, `{"error":"invalid image"}`, http.StatusBadRequest)
 		return
 	}
 
-	thumb := imaging.Fill(src, 200, 200, imaging.Center, imaging.Lanczos)
-
-	// Save as {userId}.jpg — always replaces
-	avatarPath := filepath.Join(avatarDir, fmt.Sprintf("%d.jpg", userID))
-	out, err := os.Create(avatarPath)
+	avatarURL, err := h.Storage.StoreAvatarJPEG(userID, src)
 	if err != nil {
-		http.Error(w, `{"error":"internal error"}`, http.StatusInternalServerError)
-		return
-	}
-	defer out.Close()
-
-	if err := imaging.Encode(out, thumb, imaging.JPEG, imaging.JPEGQuality(80)); err != nil {
+		log.Printf("[USER] avatar upload error: %v", err)
 		http.Error(w, `{"error":"internal error"}`, http.StatusInternalServerError)
 		return
 	}
 
-	log.Printf("[USER] type=avatar_upload user_id=%d", userID)
-	writeJSON(w, http.StatusOK, map[string]string{"message": "avatar uploaded"})
+	log.Printf("[USER] type=avatar_upload user_id=%d url=%s", userID, avatarURL)
+	writeJSON(w, http.StatusOK, map[string]string{"message": "avatar uploaded", "avatar_url": avatarURL})
 }
 
 // UpdateDisplayName updates the user's display name.
@@ -204,19 +188,25 @@ func (h *UserHandler) ServeAvatar(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	avatarPath := filepath.Join(h.Cfg.PhotoDir, "avatars", fmt.Sprintf("%d.jpg", id))
-	if _, err := os.Stat(avatarPath); os.IsNotExist(err) {
+	avatarURL := h.Storage.PublicURL(storage.AvatarKey(id))
+	if avatarURL == "" {
 		http.Error(w, "not found", http.StatusNotFound)
 		return
 	}
 
-	// Security: validate the path doesn't escape
-	if strings.Contains(avatarPath, "..") {
-		http.Error(w, "invalid path", http.StatusBadRequest)
+	// If it's an absolute URL (R2), redirect. Otherwise serve locally.
+	if strings.HasPrefix(avatarURL, "http://") || strings.HasPrefix(avatarURL, "https://") {
+		http.Redirect(w, r, avatarURL, http.StatusFound)
+		return
+	}
+
+	// Fallback: local path — check existence and serve
+	if !h.Storage.Exists(storage.AvatarKey(id)) {
+		http.Error(w, "not found", http.StatusNotFound)
 		return
 	}
 
 	w.Header().Set("Content-Type", "image/jpeg")
 	w.Header().Set("Cache-Control", "public, max-age=3600")
-	http.ServeFile(w, r, avatarPath)
+	http.ServeFile(w, r, avatarURL)
 }

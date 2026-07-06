@@ -12,14 +12,13 @@ import (
 	"math"
 	"net/http"
 	"os"
-	"path/filepath"
-	"strings"
 	"time"
 
 	"rybaspotting/internal/config"
 	"rybaspotting/internal/db"
 	"rybaspotting/internal/handlers"
 	"rybaspotting/internal/middleware"
+	"rybaspotting/internal/storage"
 
 	"github.com/go-chi/chi/v5"
 	chimw "github.com/go-chi/chi/v5/middleware"
@@ -49,9 +48,16 @@ func main() {
 	}
 	defer conn.Close()
 
+	// Initialize storage (R2 or local disk)
+	stor, err := storage.New(cfg)
+	if err != nil {
+		log.Fatalf("storage: %v", err)
+	}
+	log.Printf("storage: using %T", stor)
+
 	// Auto-seed if flag is set or DB is empty
 	if *seedFlag || dbIsEmpty(conn) {
-		if err := seedDevData(conn, cfg); err != nil {
+		if err := seedDevData(conn, cfg, stor); err != nil {
 			log.Printf("seed: %v (continuing anyway)", err)
 		} else {
 			log.Println("seed data ready")
@@ -60,11 +66,11 @@ func main() {
 
 	// Initialize handlers
 	authH := &handlers.AuthHandler{DB: conn, Cfg: cfg}
-	adminH := &handlers.AdminHandler{DB: conn, Cfg: cfg}
-	fishH := &handlers.FishHandler{DB: conn, Cfg: cfg}
+	adminH := &handlers.AdminHandler{DB: conn, Cfg: cfg, Storage: stor}
+	fishH := &handlers.FishHandler{DB: conn, Cfg: cfg, Storage: stor}
 	collectH := &handlers.CollectHandler{DB: conn}
 	leaderboardH := &handlers.LeaderboardHandler{DB: conn}
-	userH := &handlers.UserHandler{DB: conn, Cfg: cfg}
+	userH := &handlers.UserHandler{DB: conn, Cfg: cfg, Storage: stor}
 
 	// Build router
 	r := chi.NewRouter()
@@ -175,11 +181,12 @@ func dbIsEmpty(db *sql.DB) bool {
 
 // seedDevData populates the database with test accounts and fake fish.
 // Idempotent: if users already exist, this is a no-op.
-func seedDevData(conn *sql.DB, cfg *config.Config) error {
-	// Ensure photo directory exists
-	photoDir := cfg.PhotoDir
-	if err := os.MkdirAll(photoDir, 0755); err != nil {
-		return fmt.Errorf("mkdir %s: %w", photoDir, err)
+func seedDevData(conn *sql.DB, cfg *config.Config, stor storage.Storage) error {
+	// Ensure photo directory exists (for local storage fallback)
+	if cfg.PhotoDir != "" {
+		if err := os.MkdirAll(cfg.PhotoDir, 0755); err != nil {
+			log.Printf("mkdir %s: %v", cfg.PhotoDir, err)
+		}
 	}
 
 	// ── Users ──────────────────────────────────────────────────────────────
@@ -233,16 +240,20 @@ func seedDevData(conn *sql.DB, cfg *config.Config) error {
 
 	for i, f := range fish {
 		filename := fmt.Sprintf("seed_%d.jpg", i+1)
-		thumbFilename := fmt.Sprintf("seed_%d_thumb.jpg", i+1)
 
-		// Generate placeholder photos if they don't exist
-		for _, p := range []string{
-			filepath.Join(photoDir, filename),
-			filepath.Join(photoDir, thumbFilename),
-		} {
-			if _, err := os.Stat(p); os.IsNotExist(err) {
-				genPlaceholder(p, i, strings.Contains(p, "_thumb"))
-			}
+		// Generate and upload placeholder via storage
+		var buf bytes.Buffer
+		genPlaceholderImage(&buf, i, false)
+		if _, err := stor.Store(filename, buf.Bytes(), "image/jpeg"); err != nil {
+			log.Printf("  seed: failed to store %s: %v", filename, err)
+		}
+
+		// Thumbnail
+		thumbFilename := fmt.Sprintf("seed_%d_thumb.jpg", i+1)
+		var thumbBuf bytes.Buffer
+		genPlaceholderImage(&thumbBuf, i, true)
+		if _, err := stor.Store(thumbFilename, thumbBuf.Bytes(), "image/jpeg"); err != nil {
+			log.Printf("  seed: failed to store %s: %v", thumbFilename, err)
 		}
 
 		var fishID int
@@ -282,37 +293,27 @@ func seedDevData(conn *sql.DB, cfg *config.Config) error {
 	return nil
 }
 
-// genPlaceholder creates a tiny gradient JPEG for seed fish photos.
-func genPlaceholder(path string, index int, thumb bool) {
+// genPlaceholderImage writes a tiny gradient JPEG to the given writer.
+func genPlaceholderImage(w *bytes.Buffer, index int, thumb bool) {
 	hues := []float64{0.0, 30.0, 120.0, 240.0, 300.0}
 	hue := hues[index%len(hues)]
 
-	w, h := 600, 600
+	width, height := 600, 600
 	if thumb {
-		w, h = 200, 200
+		width, height = 200, 200
 	}
 
-	img := image.NewRGBA(image.Rect(0, 0, w, h))
-	for y := 0; y < h; y++ {
-		for x := 0; x < w; x++ {
-			r := uint8(math.Sin(float64(x)/float64(w)*math.Pi+hue*math.Pi/180)*127 + 128)
-			g := uint8(math.Cos(float64(y)/float64(h)*math.Pi+hue*math.Pi/180)*127 + 128)
+	img := image.NewRGBA(image.Rect(0, 0, width, height))
+	for y := 0; y < height; y++ {
+		for x := 0; x < width; x++ {
+			r := uint8(math.Sin(float64(x)/float64(width)*math.Pi+hue*math.Pi/180)*127 + 128)
+			g := uint8(math.Cos(float64(y)/float64(height)*math.Pi+hue*math.Pi/180)*127 + 128)
 			b := uint8(200 - uint8(hue))
 			img.Set(x, y, color.RGBA{r, g, b, 255})
 		}
 	}
 
-	f, err := os.Create(path)
-	if err != nil {
-		log.Printf("  create placeholder %s: %v", path, err)
-		return
+	if err := jpeg.Encode(w, img, &jpeg.Options{Quality: 70}); err != nil {
+		log.Printf("  encode placeholder: %v", err)
 	}
-	defer f.Close()
-
-	var buf bytes.Buffer
-	if err := jpeg.Encode(&buf, img, &jpeg.Options{Quality: 70}); err != nil {
-		log.Printf("  encode placeholder %s: %v", path, err)
-		return
-	}
-	f.Write(buf.Bytes())
 }

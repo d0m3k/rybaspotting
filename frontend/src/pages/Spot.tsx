@@ -430,7 +430,7 @@ export function SpotPage({ onHideNav, onStatsChanged }: Props) {
                   <h3>🐟 W pobliżu ({nearbyBeforeCapture[0]?.distance_meters?.toFixed(0)}m) — zbierz!</h3>
                   {nearbyBeforeCapture.map((f) => (
                     <div key={f.id} class="nearby-card" onClick={() => handleCollectExisting(f.id)}>
-                      <img src={`/api/photos/${f.photo_filename}`} alt="ryba" class="nearby-thumb" />
+                      <img src={f.photo_url || `/api/photos/${f.photo_filename}`} alt="ryba" class="nearby-thumb" />
                       <div>
                         <p>Spotter: {f.spotter_name}</p>
                         <p>{f.distance_meters?.toFixed(0)}m od Ciebie</p>
@@ -473,7 +473,7 @@ export function SpotPage({ onHideNav, onStatsChanged }: Props) {
                   <h3>🐟 W pobliżu ({nearbyBeforeCapture[0]?.distance_meters?.toFixed(0)}m) — zbierz!</h3>
                   {nearbyBeforeCapture.map((f) => (
                     <div key={f.id} class="nearby-card" onClick={() => handleCollectExisting(f.id)}>
-                      <img src={`/api/photos/${f.photo_filename}`} alt="ryba" class="nearby-thumb" />
+                      <img src={f.photo_url || `/api/photos/${f.photo_filename}`} alt="ryba" class="nearby-thumb" />
                       <div>
                         <p>Spotter: {f.spotter_name}</p>
                         <p>{f.distance_meters?.toFixed(0)}m od Ciebie</p>
@@ -586,7 +586,7 @@ export function SpotPage({ onHideNav, onStatsChanged }: Props) {
               <h3>Czy to jedna z tych ryb?</h3>
               {nearbyFish.map((f) => (
                 <div key={f.id} class="nearby-card" onClick={() => handleCollectExisting(f.id)}>
-                  <img src={`/api/photos/${f.photo_filename}`} alt="ryba" class="nearby-thumb" />
+                  <img src={f.photo_url || `/api/photos/${f.photo_filename}`} alt="ryba" class="nearby-thumb" />
                   <div>
                     <p>Spotter: {f.spotter_name}</p>
                     <p>{f.distance_meters.toFixed(0)}m od Ciebie</p>

@@ -306,7 +306,7 @@ export function AdminStatsPage() {
             <div key={fish.id} style="background:var(--bg-card);border-radius:14px;border:1px solid var(--border);overflow:hidden;">
               <div style="width:100%;aspect-ratio:4/3;background:var(--bg-highlight);overflow:hidden;">
                 {fish.photo_filename ? (
-                  <img src={`/api/photos/${fish.photo_filename}`} alt={`#${fish.id}`} style="width:100%;height:100%;object-fit:cover;" loading="lazy" />
+                  <img src={fish.photo_url || `/api/photos/${fish.photo_filename}`} alt={`#${fish.id}`} style="width:100%;height:100%;object-fit:cover;" loading="lazy" />
                 ) : <div style="display:flex;align-items:center;justify-content:center;height:100%;color:var(--text-muted);">Brak zdjęcia</div>}
               </div>
               <div style="padding:12px;">
