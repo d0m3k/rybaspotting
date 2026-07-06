@@ -120,7 +120,8 @@ export function MapPage({ onStatsChanged, userId }: { onStatsChanged?: () => voi
           try {
             const detail = await api.getFish(f.id);
             setFishDetail(detail);
-          } catch {
+          } catch (err) {
+            console.error('Failed to load fish detail', err);
             setFishDetail(null);
           } finally {
             setDetailLoading(false);
@@ -163,9 +164,17 @@ export function MapPage({ onStatsChanged, userId }: { onStatsChanged?: () => voi
       if (onStatsChanged) onStatsChanged();
       // Track locally so the marker turns green immediately
       setCollectedFishIds(prev => new Set(prev).add(fishId));
-      // Refresh detail so the UI reflects the new collection
-      const detail = await api.getFish(fishId);
-      setFishDetail(detail);
+      // Optimistically update the bottom sheet so the button disappears instantly
+      const currentUsername = loadAuth()?.username || '';
+      setFishDetail((prev: any) => {
+        if (!prev) return prev;
+        const alreadyThere = prev.collectors?.some((c: any) => c.username === currentUsername);
+        if (alreadyThere) return prev;
+        return {
+          ...prev,
+          collectors: [...(prev.collectors || []), { username: currentUsername, collected_at: new Date().toISOString() }],
+        };
+      });
     } catch (err: any) {
       alert(err.message);
     }
