@@ -119,6 +119,7 @@ func main() {
 			r.Get("/users/me/collections", userH.MyCollections)
 			r.Post("/users/me/avatar", userH.UploadAvatar)
 			r.Put("/users/me/display-name", userH.UpdateDisplayName)
+			r.Delete("/users/me", userH.DeleteMyAccount)
 
 			// Admin-only endpoints
 			r.Group(func(r chi.Router) {

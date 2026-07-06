@@ -1476,3 +1476,218 @@ h3 {
 .update-toast-btn:active {
   opacity: 0.8;
 }
+
+/* === Privacy Banner === */
+.privacy-banner {
+  position: fixed;
+  bottom: 80px;
+  left: 12px;
+  right: 12px;
+  max-width: 456px;
+  margin: 0 auto;
+  z-index: 9997;
+  background: var(--bg-card);
+  border: 2px solid #FFE66D;
+  border-radius: 14px;
+  padding: 14px 16px;
+  box-shadow: 0 4px 24px rgba(0,0,0,0.12);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  animation: slideUp 0.4s ease-out;
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--text);
+}
+
+.privacy-banner-link {
+  color: #4ECDC4;
+  text-decoration: underline;
+  cursor: pointer;
+  font-weight: 500;
+}
+
+.privacy-banner-ok {
+  align-self: flex-end;
+  background: linear-gradient(135deg, #4ECDC4, #45b7aa);
+  color: #fff;
+  border: none;
+  border-radius: 10px;
+  padding: 8px 22px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.2s;
+}
+
+.privacy-banner-ok:active {
+  transform: scale(0.96);
+  opacity: 0.85;
+}
+
+/* === Privacy Policy Page === */
+.privacy-back-btn {
+  display: inline-block;
+  background: none;
+  border: 2px solid var(--border);
+  border-radius: 10px;
+  padding: 6px 14px;
+  margin-bottom: 12px;
+  font-size: 14px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.privacy-back-btn:hover {
+  border-color: #4ECDC4;
+  color: #4ECDC4;
+}
+
+.privacy-date {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-bottom: 20px;
+}
+
+.privacy-section {
+  margin-bottom: 20px;
+}
+
+.privacy-section h3 {
+  font-size: 16px;
+  color: #FF6B6B;
+  margin-bottom: 6px;
+}
+
+.privacy-section p {
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--text);
+  margin-bottom: 6px;
+}
+
+.privacy-section ul {
+  padding-left: 20px;
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--text);
+}
+
+.privacy-section li {
+  margin-bottom: 4px;
+}
+
+.privacy-section a {
+  color: #4ECDC4;
+  text-decoration: underline;
+}
+
+/* === Delete Account Button & Dialog === */
+.btn-delete-account {
+  width: 100%;
+  padding: 14px;
+  margin-top: 8px;
+  background: transparent;
+  color: #E74C3C;
+  border: 2px dashed #E74C3C;
+  border-radius: 12px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-delete-account:hover {
+  background: rgba(231, 76, 60, 0.06);
+  border-style: solid;
+}
+
+.btn-delete-account:active {
+  transform: scale(0.98);
+}
+
+.delete-dialog-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+  padding: 20px;
+  animation: fadeIn 0.2s ease-out;
+}
+
+.delete-dialog {
+  background: var(--bg-card);
+  border-radius: 18px;
+  padding: 24px 20px;
+  max-width: 380px;
+  width: 100%;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.25);
+  border: 2px solid #E74C3C;
+}
+
+.delete-dialog h3 {
+  font-size: 18px;
+  color: #E74C3C;
+  margin-bottom: 8px;
+}
+
+.delete-dialog p {
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--text);
+  margin-bottom: 6px;
+}
+
+.delete-dialog strong {
+  color: #E74C3C;
+}
+
+.delete-dialog-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 16px;
+}
+
+.delete-dialog-cancel {
+  flex: 1;
+  padding: 12px;
+  border: 2px solid var(--border);
+  border-radius: 12px;
+  background: var(--bg-secondary);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  color: var(--text);
+  transition: all 0.2s;
+}
+
+.delete-dialog-cancel:hover {
+  border-color: var(--text-secondary);
+}
+
+.delete-dialog-confirm {
+  flex: 1;
+  padding: 12px;
+  border: none;
+  border-radius: 12px;
+  background: #E74C3C;
+  color: #fff;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.delete-dialog-confirm:hover:not(:disabled) {
+  background: #C0392B;
+}
+
+.delete-dialog-confirm:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}

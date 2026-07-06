@@ -105,6 +105,9 @@ export const api = {
       body: JSON.stringify({ display_name: displayName }),
     }),
 
+  deleteMyAccount: () =>
+    request<{ message: string }>('/api/users/me', { method: 'DELETE' }),
+
   // Admin (protected by JWT — only users with is_admin=true)
   getAdminStats: () =>
     request<{

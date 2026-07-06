@@ -15,6 +15,7 @@ interface UserStats {
 interface Props {
   auth: AuthState;
   onLogout: () => void;
+  onOpenPrivacy: () => void;
 }
 
 function getInitial(name: string): string {
@@ -22,7 +23,7 @@ function getInitial(name: string): string {
   return name.charAt(0).toUpperCase();
 }
 
-export function ProfilePage({ auth, onLogout }: Props) {
+export function ProfilePage({ auth, onLogout, onOpenPrivacy }: Props) {
   const [stats, setStats] = useState<UserStats | null>(null);
   const [mySpotted, setMySpotted] = useState<any[]>([]);
   const [myCollected, setMyCollected] = useState<any[]>([]);
@@ -32,6 +33,8 @@ export function ProfilePage({ auth, onLogout }: Props) {
   const [avatarKey, setAvatarKey] = useState(0); // cache-bust
   const [editingName, setEditingName] = useState(false);
   const [nameDraft, setNameDraft] = useState('');
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const avatarInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -102,6 +105,18 @@ export function ProfilePage({ auth, onLogout }: Props) {
       await api.uncollect(fishId);
       setMyCollected(prev => prev.filter(f => f.id !== fishId));
     } catch (err: any) { alert(err.message); }
+  }
+
+  async function handleDeleteAccount() {
+    setDeleting(true);
+    try {
+      await api.deleteMyAccount();
+      setShowDeleteDialog(false);
+      onLogout();
+    } catch (err: any) {
+      alert(err.message);
+      setDeleting(false);
+    }
   }
 
   function renderFishItem(f: any, showCollectedAt?: boolean, allowDelete?: boolean, onDelete?: (id: number) => void) {
@@ -232,6 +247,11 @@ export function ProfilePage({ auth, onLogout }: Props) {
           <a href="https://dom3k.pl" target="_blank" rel="noopener">dom3k</a>
           {' '}with ❤️
         </p>
+        <p style="margin-top:8px;">
+          <span class="privacy-banner-link" onClick={onOpenPrivacy}>
+            Polityka Prywatności
+          </span>
+        </p>
         <a
           class="profile-build-hash"
           href={`https://github.com/d0m3k/rybaspotting/commit/${__BUILD_HASH__}`}
@@ -241,7 +261,48 @@ export function ProfilePage({ auth, onLogout }: Props) {
         >
           {__BUILD_HASH__}
         </a>
+
+        <button
+          class="btn-delete-account"
+          onClick={() => setShowDeleteDialog(true)}
+        >
+          🗑 Usuń konto bezpowrotnie
+        </button>
       </footer>
+
+      {/* Delete Account Confirmation Dialog */}
+      {showDeleteDialog && (
+        <div class="delete-dialog-overlay" onClick={() => !deleting && setShowDeleteDialog(false)}>
+          <div class="delete-dialog" onClick={(e) => e.stopPropagation()}>
+            <h3>⚠️ Usunięcie konta</h3>
+            <p>
+              Czy na pewno chcesz <strong>bezpowrotnie usunąć</strong> swoje konto?
+            </p>
+            <p>
+              Ta operacja <strong>usunie również wszystkie ryby</strong>, które
+              spottedowałeś/aś, wraz z ich zdjęciami, oraz wszystkie Twoje kolekcje.
+              Dane zostaną trwale skasowane z bazy i dysku serwera —{' '}
+              <strong>nie będzie można ich odzyskać</strong>.
+            </p>
+            <div class="delete-dialog-actions">
+              <button
+                class="delete-dialog-cancel"
+                onClick={() => setShowDeleteDialog(false)}
+                disabled={deleting}
+              >
+                Anuluj
+              </button>
+              <button
+                class="delete-dialog-confirm"
+                onClick={handleDeleteAccount}
+                disabled={deleting}
+              >
+                {deleting ? 'Usuwam…' : 'Usuń konto'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

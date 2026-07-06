@@ -179,6 +179,93 @@ func (h *UserHandler) UpdateDisplayName(w http.ResponseWriter, r *http.Request) 
 	writeJSON(w, http.StatusOK, map[string]string{"message": "display name updated", "display_name": req.DisplayName})
 }
 
+// DeleteMyAccount performs a hard delete of the authenticated user: removes all
+// fish they spotted (with photos), all their collections, their avatar, and the
+// user record itself. This is irreversible.
+func (h *UserHandler) DeleteMyAccount(w http.ResponseWriter, r *http.Request) {
+	userID, _ := r.Context().Value(middleware.ContextUserID).(int)
+
+	// ── Gather all fish IDs spotted by this user ──────────────────────
+	rows, err := h.DB.Query(`SELECT id, photo_filename FROM fish WHERE spotted_by = $1`, userID)
+	if err != nil {
+		log.Printf("[USER] type=delete_account user_id=%d error=%v", userID, err)
+		http.Error(w, `{"error":"internal error"}`, http.StatusInternalServerError)
+		return
+	}
+	type fishRow struct {
+		ID       int
+		Filename string
+	}
+	var fishToDelete []fishRow
+	for rows.Next() {
+		var f fishRow
+		if err := rows.Scan(&f.ID, &f.Filename); err != nil {
+			continue
+		}
+		fishToDelete = append(fishToDelete, f)
+	}
+	rows.Close()
+
+	// ── Delete fish photos from disk ──────────────────────────────────
+	for _, f := range fishToDelete {
+		for _, suffix := range []string{"", "_thumb"} {
+			name := f.Filename
+			if suffix == "_thumb" {
+				name = strings.TrimSuffix(name, filepath.Ext(name)) + "_thumb" + filepath.Ext(name)
+			}
+			path := filepath.Join(h.Cfg.PhotoDir, name)
+			if err := os.Remove(path); err != nil && !os.IsNotExist(err) {
+				log.Printf("[USER] delete_photo user_id=%d path=%s error=%v", userID, path, err)
+			}
+		}
+	}
+
+	// ── Delete fish rows (cascades to collections) ────────────────────
+	if len(fishToDelete) > 0 {
+		ids := make([]string, len(fishToDelete))
+		args := make([]interface{}, len(fishToDelete)+1)
+		args[0] = userID
+		for i, f := range fishToDelete {
+			ids[i] = fmt.Sprintf("$%d", i+2)
+			args[i+1] = f.ID
+		}
+		// Use a single DELETE with IN clause — the spotted_by check is belt-and-suspenders
+		query := fmt.Sprintf(`DELETE FROM fish WHERE spotted_by = $1 AND id IN (%s)`, strings.Join(ids, ","))
+		if _, err := h.DB.Exec(query, args...); err != nil {
+			log.Printf("[USER] type=delete_account user_id=%d error=%v", userID, err)
+			http.Error(w, `{"error":"internal error"}`, http.StatusInternalServerError)
+			return
+		}
+	}
+
+	// ── Delete user's own collections (fish they collected but didn't spot) ──
+	if _, err := h.DB.Exec(`DELETE FROM collections WHERE user_id = $1`, userID); err != nil {
+		log.Printf("[USER] type=delete_account user_id=%d error=%v", userID, err)
+		http.Error(w, `{"error":"internal error"}`, http.StatusInternalServerError)
+		return
+	}
+
+	// ── Delete avatar ─────────────────────────────────────────────────
+	avatarPath := filepath.Join(h.Cfg.PhotoDir, "avatars", fmt.Sprintf("%d.jpg", userID))
+	_ = os.Remove(avatarPath)
+
+	// ── Hard delete the user ──────────────────────────────────────────
+	result, err := h.DB.Exec(`DELETE FROM users WHERE id = $1`, userID)
+	if err != nil {
+		log.Printf("[USER] type=delete_account user_id=%d error=%v", userID, err)
+		http.Error(w, `{"error":"internal error"}`, http.StatusInternalServerError)
+		return
+	}
+	rowsAffected, _ := result.RowsAffected()
+	if rowsAffected == 0 {
+		http.Error(w, `{"error":"user not found"}`, http.StatusNotFound)
+		return
+	}
+
+	log.Printf("[USER] type=delete_account user_id=%d spotted_fish=%d", userID, len(fishToDelete))
+	writeJSON(w, http.StatusOK, map[string]string{"message": "account permanently deleted"})
+}
+
 // ServeAvatar serves a user's profile picture by user ID.
 func (h *UserHandler) ServeAvatar(w http.ResponseWriter, r *http.Request) {
 	idStr := chi.URLParam(r, "userID")

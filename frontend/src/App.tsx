@@ -9,9 +9,11 @@ import { UploadPage } from './pages/Upload';
 import { LeaderboardPage } from './pages/Leaderboard';
 import { ProfilePage } from './pages/Profile';
 import { AdminStatsPage } from './pages/AdminStats';
+import { PrivacyPolicyPage } from './pages/PrivacyPolicy';
 import { NavBar } from './components/NavBar';
+import { PrivacyBanner } from './components/PrivacyBanner';
 
-type Page = 'login' | 'register' | 'map' | 'spot' | 'upload' | 'leaderboard' | 'profile' | 'admin';
+type Page = 'login' | 'register' | 'map' | 'spot' | 'upload' | 'leaderboard' | 'profile' | 'admin' | 'privacy';
 
 interface UserStats {
   spotted: number;
@@ -82,9 +84,33 @@ export function App() {
 
   if (!auth) {
     if (page === 'register') {
-      return <RegisterPage onLogin={() => setPage('login')} />;
+      return (
+        <div class="app-container">
+          <div class="app-content">
+            <RegisterPage onLogin={() => setPage('login')} />
+          </div>
+          <PrivacyBanner onOpenPolicy={() => setPage('privacy')} />
+        </div>
+      );
     }
-    return <LoginPage onLogin={handleLogin} onRegister={() => setPage('register')} />;
+    if (page === 'privacy') {
+      return (
+        <div class="app-container">
+          <div class="app-content">
+            <PrivacyPolicyPage onBack={() => setPage('login')} />
+          </div>
+          <PrivacyBanner onOpenPolicy={() => setPage('privacy')} />
+        </div>
+      );
+    }
+    return (
+      <div class="app-container">
+        <div class="app-content">
+          <LoginPage onLogin={handleLogin} onRegister={() => setPage('register')} />
+        </div>
+        <PrivacyBanner onOpenPolicy={() => setPage('privacy')} />
+      </div>
+    );
   }
 
   const displayName = stats?.display_name || auth.displayName || auth.username;
@@ -124,10 +150,12 @@ export function App() {
         {page === 'spot' && <SpotPage onHideNav={setHideNav} onStatsChanged={refreshStats} />}
         {page === 'upload' && allowUpload && <UploadPage onStatsChanged={refreshStats} />}
         {page === 'leaderboard' && <LeaderboardPage />}
-        {page === 'profile' && <ProfilePage auth={auth} onLogout={handleLogout} />}
+        {page === 'profile' && <ProfilePage auth={auth} onLogout={handleLogout} onOpenPrivacy={() => setPage('privacy')} />}
         {page === 'admin' && <AdminStatsPage />}
+        {page === 'privacy' && <PrivacyPolicyPage onBack={() => setPage(auth ? 'map' : 'login')} />}
       </div>
-      {!hideNav && <NavBar current={page} onNavigate={navigate} allowUpload={allowUpload} isAdmin={auth?.isAdmin ?? false} />}
+      {!hideNav && page !== 'privacy' && <NavBar current={page} onNavigate={navigate} allowUpload={allowUpload} isAdmin={auth?.isAdmin ?? false} />}
+      <PrivacyBanner onOpenPolicy={() => setPage('privacy')} />
     </div>
   );
 }
