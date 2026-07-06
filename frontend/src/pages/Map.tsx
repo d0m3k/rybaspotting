@@ -85,7 +85,7 @@ export function MapPage({ onStatsChanged, userId, username }: { onStatsChanged?:
   async function loadMyCollections() {
     try {
       const colls = await api.getMyCollections();
-      setCollectedFishIds(new Set(colls.map((c: any) => c.id)));
+      setCollectedFishIds(new Set(colls.map((c: any) => Number(c.id))));
     } catch { /* ignore */ }
   }
 
@@ -163,7 +163,7 @@ export function MapPage({ onStatsChanged, userId, username }: { onStatsChanged?:
       await api.collect(fishId);
       if (onStatsChanged) onStatsChanged();
       // Track locally so the marker turns green immediately
-      setCollectedFishIds(prev => new Set(prev).add(fishId));
+      setCollectedFishIds(prev => new Set(prev).add(Number(fishId)));
       // Optimistically update the bottom sheet so the button disappears instantly
       setFishDetail((prev: any) => {
         if (!prev) return prev;
@@ -184,9 +184,15 @@ export function MapPage({ onStatsChanged, userId, username }: { onStatsChanged?:
       <div id="map" class="map-container"></div>
       {loading && <div class="map-loading">Ładowanie...</div>}
 
+      <div class="map-legend">
+        <span class="map-legend-item"><span class="map-legend-dot" style="background:#FF8E72;border-color:#C0392B;"></span> do zebrania</span>
+        <span class="map-legend-item"><span class="map-legend-dot" style="background:#FFE66D;border-color:#D4AC0D;"></span> Twoja</span>
+        <span class="map-legend-item"><span class="map-legend-dot" style="background:#58D68D;border-color:#1E8449;"></span> zebrana</span>
+      </div>
+
       {selectedFish && (() => {
         const isOwnFish = userId != null && selectedFish.spotted_by === userId;
-        const hasCollected = collectedFishIds.has(selectedFish.id) ||
+        const hasCollected = collectedFishIds.has(Number(selectedFish.id)) ||
           (fishDetail?.collectors?.some((c: any) => c.username === username) ?? false);
         const canCollect = !isOwnFish && !hasCollected && !detailLoading;
 
