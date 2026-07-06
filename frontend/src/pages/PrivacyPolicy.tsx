@@ -108,17 +108,59 @@ export function PrivacyPolicyPage({ onBack }: Props) {
       </section>
 
       <section class="privacy-section">
-        <h3>6. Przechowywanie danych</h3>
+        <h3>6. Gdzie przechowywane są dane</h3>
         <p>
-          Dane przechowywane są na serwerze VPS zlokalizowanym na terenie Unii
-          Europejskiej (Niemcy, mikr.us). Zdjęcia przechowywane są na dysku
-          serwera. Logi serwera są przechowywane przez ograniczony czas i
-          usuwane automatycznie.
+          <strong>Baza danych i aplikacja</strong> — serwer VPS zlokalizowany
+          w Helsinkach, Finlandia (Hetzner, operator: mikr.us). Na serwerze
+          przechowywane są: dane kont, logi serwera oraz — w przypadku braku
+          konfiguracji R2 — zdjęcia ryb i awatary.
+        </p>
+        <p>
+          <strong>Zdjęcia (R2)</strong> — jeśli skonfigurowano, zdjęcia ryb i
+          awatary przechowywane są w Cloudflare R2 (object storage), którego
+          dane domyślnie replikowane są w ramach Unii Europejskiej. Cloudflare
+          przetwarza te dane jako podmiot przetwarzający (Data Processor) zgodnie
+          z RODO.
+        </p>
+        <p>
+          Logi serwera są przechowywane przez ograniczony czas i usuwane
+          automatycznie.
         </p>
       </section>
 
       <section class="privacy-section">
-        <h3>7. Ciasteczka i localStorage</h3>
+        <h3>7. Cloudflare — DNS, tunel i CDN</h3>
+        <p>
+          Aplikacja korzysta z usług Cloudflare w następującym zakresie:
+        </p>
+        <ul>
+          <li>
+            <strong>DNS i proxy (ryby.dom3k.pl)</strong> — ruch HTTPS do
+            aplikacji przechodzi przez sieć Cloudflare, która działa jako
+            reverse proxy. Cloudflare widzi adresy IP użytkowników oraz
+            zaszyfrowany ruch HTTPS (nie widzi treści). Ma to na celu ochronę
+            przed atakami DDoS i przyspieszenie dostarczania treści (CDN).
+          </li>
+          <li>
+            <strong>Cloudflare Tunnel (shell.dom3k.pl)</strong> — używany
+            wyłącznie do administracyjnego dostępu SSH do serwera. Nie przetwarza
+            danych użytkowników końcowych.
+          </li>
+          <li>
+            <strong>Cloudflare R2</strong> — opisane w sekcji 6. Przechowuje
+            zdjęcia jako obiekty. Dostęp do nich odbywa się przez publiczny URL
+            R2 (z pominięciem proxy Cloudflare dla domeny).
+          </li>
+        </ul>
+        <p>
+          Cloudflare, Inc. (USA) jest podmiotem przetwarzającym dane na podstawie
+          Standardowych Klauzul Umownych (SCC) zatwierdzonych przez Komisję
+          Europejską, co zapewnia zgodność transferu danych z RODO.
+        </p>
+      </section>
+
+      <section class="privacy-section">
+        <h3>8. Ciasteczka i localStorage</h3>
         <p>
           Aplikacja używa wyłącznie <strong>localStorage</strong> przeglądarki do
           przechowywania:
@@ -134,7 +176,7 @@ export function PrivacyPolicyPage({ onBack }: Props) {
       </section>
 
       <section class="privacy-section">
-        <h3>8. Kontakt</h3>
+        <h3>9. Kontakt</h3>
         <p>
           W sprawach dotyczących prywatności i danych osobowych prosimy o
           kontakt:{' '}
