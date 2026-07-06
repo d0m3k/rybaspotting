@@ -60,8 +60,10 @@ export function PrivacyPolicyPage({ onBack }: Props) {
           <li>Nie używamy zewnętrznych trackerów ani narzędzi analitycznych.</li>
           <li>Nie wyświetlamy reklam.</li>
           <li>
-            Nie udostępniamy danych podmiotom trzecim (chyba że wymaga tego
-            prawo).
+            Nie udostępniamy danych podmiotom trzecim w celach marketingowych,
+            analitycznych ani handlowych. Dane są udostępniane wyłącznie
+            podmiotom przetwarzającym niezbędnym do działania aplikacji
+            (Cloudflare — patrz sekcja 7) oraz na żądanie uprawnionych organów.
           </li>
           <li>Nie zbieramy dokładnej lokalizacji w tle.</li>
         </ul>
@@ -133,34 +135,38 @@ export function PrivacyPolicyPage({ onBack }: Props) {
       <section class="privacy-section">
         <h3>7. Cloudflare — DNS, tunel i CDN</h3>
         <p>
-          Aplikacja korzysta z usług Cloudflare w następującym zakresie:
+          Aplikacja korzysta z infrastruktury Cloudflare jako podmiotu
+          przetwarzającego dane (Data Processor). Oto co Cloudflare widzi
+          i dlaczego:
         </p>
         <ul>
           <li>
-            <strong>DNS i proxy (ryby.dom3k.pl)</strong> — domena używa
+            <strong>Proxy DNS (ryby.dom3k.pl)</strong> — domena używa
             proxy Cloudflare (pomarańczowa chmurka). Cloudflare terminuje TLS
             na swoim brzegu sieci, a następnie przekazuje odszyfrowany ruch
-            przez tunel (cloudflared) do serwera. <strong>Oznacza to, że
-            Cloudflare widzi pełną treść ruchu HTTP</strong> — w tym tokeny
-            JWT, nazwy użytkowników, dane ryb i przesyłane zdjęcia — jako
-            reverse proxy, niezbędny do świadczenia usługi CDN i ochrony DDoS.
-            Cloudflare przetwarza te dane jako podmiot przetwarzający.
+            przez tunel cloudflared do serwera (localhost:80).{' '}
+            <strong>Cloudflare widzi pełną treść ruchu HTTP</strong> — w tym
+            tokeny JWT, nazwy użytkowników, dane ryb i przesyłane zdjęcia.
+            Jest to nieodłączna cecha działania reverse proxy/CDN i ochrony
+            przed DDoS.
           </li>
           <li>
-            <strong>Cloudflare Tunnel (shell.dom3k.pl)</strong> — używany
-            wyłącznie do administracyjnego dostępu SSH do serwera. Nie przetwarza
-            danych użytkowników końcowych.
+            <strong>Tunel cloudflared</strong> — szyfrowane połączenie między
+            serwerem VPS a siecią Cloudflare. Ruch z{' '}
+            <code>ryby.dom3k.pl</code> jest kierowany przez tunel do serwera
+            (HTTP localhost:80), gdzie nginx przekazuje go do aplikacji.
+            Tunel publikuje również <code>m.dom3k.pl</code> (ta sama aplikacja)
+            — dane przetwarzane są identycznie jak dla głównej domeny.
           </li>
           <li>
             <strong>Cloudflare R2</strong> — opisane w sekcji 6. Przechowuje
-            zdjęcia jako obiekty. Dostęp do nich odbywa się przez publiczny URL
-            R2 (z pominięciem proxy Cloudflare dla domeny).
+            zdjęcia jako obiekty.
           </li>
         </ul>
         <p>
-          Cloudflare, Inc. (USA) jest podmiotem przetwarzającym dane na podstawie
-          Standardowych Klauzul Umownych (SCC) zatwierdzonych przez Komisję
-          Europejską, co zapewnia zgodność transferu danych z RODO.
+          Cloudflare, Inc. (USA) przetwarza dane na podstawie Standardowych
+          Klauzul Umownych (SCC) zatwierdzonych przez Komisję Europejską, co
+          zapewnia zgodność transferu danych z RODO.
         </p>
       </section>
 
