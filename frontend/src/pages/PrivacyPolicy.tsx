@@ -19,7 +19,7 @@ export function PrivacyPolicyPage({ onBack }: Props) {
           niekomercyjna, społecznościowa gra polegająca na znajdowaniu i
           kolekcjonowaniu graffiti ryb w Krakowie. Operatorem aplikacji jest
           osoba fizyczna dostępna pod adresem e-mail:{' '}
-          <a href="mailto:kontakt@dom3k.pl">kontakt@dom3k.pl</a>.
+          <a href="mailto:ryby@dom3k.pl">ryby@dom3k.pl</a>.
         </p>
       </section>
 
@@ -138,7 +138,7 @@ export function PrivacyPolicyPage({ onBack }: Props) {
         <p>
           W sprawach dotyczących prywatności i danych osobowych prosimy o
           kontakt:{' '}
-          <a href="mailto:kontakt@dom3k.pl">kontakt@dom3k.pl</a>
+          <a href="mailto:ryby@dom3k.pl">ryby@dom3k.pl</a>
         </p>
       </section>
     </div>
