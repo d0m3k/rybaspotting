@@ -125,10 +125,8 @@ export function PrivacyPolicyPage({ onBack }: Props) {
         <p>
           Logi serwera (zapisywane przez systemd journal) zawierają adresy IP
           przy każdym żądaniu HTTP oraz przy zdarzeniach uwierzytelniania.
-          Dziennik systemowy (journald) automatycznie rotuje i usuwa stare wpisy
-          po przekroczeniu limitu rozmiaru (domyślnie ~4 GB), co na typowym
-          serwerze oznacza retencję od kilku dni do kilku tygodni. Planowane
-          jest skonfigurowanie krótszego, jawnego okresu retencji logów.
+          Są automatycznie usuwane po <strong>7 dniach</strong> (MaxRetentionSec=7day)
+          lub po przekroczeniu 50 MB, w zależności co nastąpi pierwsze.
         </p>
       </section>
 
