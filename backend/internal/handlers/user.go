@@ -6,8 +6,6 @@ import (
 	"fmt"
 	"log"
 	"net/http"
-	"os"
-	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -209,17 +207,14 @@ func (h *UserHandler) DeleteMyAccount(w http.ResponseWriter, r *http.Request) {
 	}
 	rows.Close()
 
-	// ── Delete fish photos from disk ──────────────────────────────────
+	// ── Delete fish photos from storage (R2 or local disk) ───────────
 	for _, f := range fishToDelete {
-		for _, suffix := range []string{"", "_thumb"} {
-			name := f.Filename
-			if suffix == "_thumb" {
-				name = strings.TrimSuffix(name, filepath.Ext(name)) + "_thumb" + filepath.Ext(name)
-			}
-			path := filepath.Join(h.Cfg.PhotoDir, name)
-			if err := os.Remove(path); err != nil && !os.IsNotExist(err) {
-				log.Printf("[USER] delete_photo user_id=%d path=%s error=%v", userID, path, err)
-			}
+		if err := h.Storage.Delete(f.Filename); err != nil {
+			log.Printf("[USER] delete_photo user_id=%d key=%s error=%v", userID, f.Filename, err)
+		}
+		thumbKey := storage.ThumbFilename(f.Filename)
+		if err := h.Storage.Delete(thumbKey); err != nil {
+			log.Printf("[USER] delete_photo user_id=%d key=%s error=%v", userID, thumbKey, err)
 		}
 	}
 
@@ -248,9 +243,11 @@ func (h *UserHandler) DeleteMyAccount(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// ── Delete avatar ─────────────────────────────────────────────────
-	avatarPath := filepath.Join(h.Cfg.PhotoDir, "avatars", fmt.Sprintf("%d.jpg", userID))
-	_ = os.Remove(avatarPath)
+	// ── Delete avatar (from R2 or local disk) ────────────────────────
+	avatarKey := storage.AvatarKey(userID)
+	if err := h.Storage.Delete(avatarKey); err != nil {
+		log.Printf("[USER] delete_avatar user_id=%d key=%s error=%v", userID, avatarKey, err)
+	}
 
 	// ── Hard delete the user ──────────────────────────────────────────
 	result, err := h.DB.Exec(`DELETE FROM users WHERE id = $1`, userID)
