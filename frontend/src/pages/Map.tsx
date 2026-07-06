@@ -49,7 +49,7 @@ function fishMarkerIcon(fish: any, userId: number | undefined, collectedIds: Set
   return makeFishIcon('#FF8E72', '#C0392B', '#FF6B6B', '#FFB3A7');
 }
 
-export function MapPage({ onStatsChanged, userId }: { onStatsChanged?: () => void; userId?: number }) {
+export function MapPage({ onStatsChanged, userId, username }: { onStatsChanged?: () => void; userId?: number; username?: string }) {
   const mapRef = useRef<L.Map | null>(null);
   const markersRef = useRef<L.Marker[]>([]);
   const [fishList, setFishList] = useState<any[]>([]);
@@ -146,8 +146,8 @@ export function MapPage({ onStatsChanged, userId }: { onStatsChanged?: () => voi
           });
         });
         const dist = distanceMeters(pos.coords.latitude, pos.coords.longitude, fishLat, fishLng);
-        if (dist > 50) {
-          alert(`Jesteś za daleko! (${dist.toFixed(0)}m od ryby, max 50m). Podejdź bliżej.`);
+        if (isNaN(dist) || dist > 50) {
+          alert(`Jesteś za daleko! (${isNaN(dist) ? '?' : dist.toFixed(0)}m od ryby, max 50m). Podejdź bliżej.`);
           return;
         }
       } catch {
@@ -165,14 +165,13 @@ export function MapPage({ onStatsChanged, userId }: { onStatsChanged?: () => voi
       // Track locally so the marker turns green immediately
       setCollectedFishIds(prev => new Set(prev).add(fishId));
       // Optimistically update the bottom sheet so the button disappears instantly
-      const currentUsername = loadAuth()?.username || '';
       setFishDetail((prev: any) => {
         if (!prev) return prev;
-        const alreadyThere = prev.collectors?.some((c: any) => c.username === currentUsername);
+        const alreadyThere = prev.collectors?.some((c: any) => c.username === username);
         if (alreadyThere) return prev;
         return {
           ...prev,
-          collectors: [...(prev.collectors || []), { username: currentUsername, collected_at: new Date().toISOString() }],
+          collectors: [...(prev.collectors || []), { username: username, collected_at: new Date().toISOString() }],
         };
       });
     } catch (err: any) {
@@ -187,8 +186,7 @@ export function MapPage({ onStatsChanged, userId }: { onStatsChanged?: () => voi
 
       {selectedFish && (() => {
         const isOwnFish = userId != null && selectedFish.spotted_by === userId;
-        const currentUsername = loadAuth()?.username || '';
-        const hasCollected = fishDetail?.collectors?.some((c: any) => c.username === currentUsername) ?? false;
+        const hasCollected = fishDetail?.collectors?.some((c: any) => c.username === username) ?? false;
         const canCollect = !isOwnFish && !hasCollected && !detailLoading;
 
         return (
