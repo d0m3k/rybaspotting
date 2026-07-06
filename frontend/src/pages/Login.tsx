@@ -50,6 +50,8 @@ export function LoginPage({ onLogin, onRegister }: Props) {
             value={username}
             onInput={(e: any) => setUsername(e.target.value)}
             required
+            autocomplete="username"
+            autocapitalize="off"
           />
           <input
             class="input"
@@ -58,6 +60,7 @@ export function LoginPage({ onLogin, onRegister }: Props) {
             value={password}
             onInput={(e: any) => setPassword(e.target.value)}
             required
+            autocomplete="current-password"
           />
           {error && <p class="error-msg">{error}</p>}
           <button class="btn btn-primary" type="submit" disabled={loading}>

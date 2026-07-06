@@ -186,7 +186,8 @@ export function MapPage({ onStatsChanged, userId, username }: { onStatsChanged?:
 
       {selectedFish && (() => {
         const isOwnFish = userId != null && selectedFish.spotted_by === userId;
-        const hasCollected = fishDetail?.collectors?.some((c: any) => c.username === username) ?? false;
+        const hasCollected = collectedFishIds.has(selectedFish.id) ||
+          (fishDetail?.collectors?.some((c: any) => c.username === username) ?? false);
         const canCollect = !isOwnFish && !hasCollected && !detailLoading;
 
         return (

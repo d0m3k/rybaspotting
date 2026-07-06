@@ -69,6 +69,8 @@ export function RegisterPage({ onLogin }: Props) {
             value={username}
             onInput={(e: any) => setUsername(e.target.value)}
             required
+            autocomplete="username"
+            autocapitalize="off"
           />
           <input
             class="input"
@@ -77,6 +79,7 @@ export function RegisterPage({ onLogin }: Props) {
             value={password}
             onInput={(e: any) => setPassword(e.target.value)}
             required
+            autocomplete="new-password"
           />
           <input
             class="input"
@@ -96,6 +99,7 @@ export function RegisterPage({ onLogin }: Props) {
             onInput={(e: any) => setCaptcha(e.target.value)}
             required
             autocomplete="off"
+            autocapitalize="off"
           />
           {error && <p class="error-msg">{error}</p>}
           {message && (
