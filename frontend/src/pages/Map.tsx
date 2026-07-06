@@ -43,14 +43,10 @@ function makeFishIcon(bodyColor: string, strokeColor: string, finColor: string, 
   });
 }
 
-const ICON_DEFAULT   = (fid: string) => makeFishIcon('#FF8E72', '#C0392B', '#FF6B6B', '#FFB3A7'); // orange — not yours
-const ICON_SPOTTED   = (fid: string) => makeFishIcon('#FFE66D', '#D4AC0D', '#F1C40F', '#FFF3B0'); // yellow/gold — you spotted it
-const ICON_COLLECTED = (fid: string) => makeFishIcon('#58D68D', '#1E8449', '#2ECC71', '#A9DFBF'); // green — you collected it
-
 function fishMarkerIcon(fish: any, userId: number | undefined, collectedIds: Set<number>) {
-  if (userId != null && fish.spotted_by === userId) return ICON_SPOTTED;
-  if (collectedIds.has(fish.id)) return ICON_COLLECTED;
-  return ICON_DEFAULT;
+  if (userId != null && fish.spotted_by === userId) return makeFishIcon('#FFE66D', '#D4AC0D', '#F1C40F', '#FFF3B0');
+  if (collectedIds.has(fish.id)) return makeFishIcon('#58D68D', '#1E8449', '#2ECC71', '#A9DFBF');
+  return makeFishIcon('#FF8E72', '#C0392B', '#FF6B6B', '#FFB3A7');
 }
 
 export function MapPage({ onStatsChanged, userId }: { onStatsChanged?: () => void; userId?: number }) {
