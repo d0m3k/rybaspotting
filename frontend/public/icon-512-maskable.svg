@@ -1,0 +1,32 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
+  <!-- Maskable: full-bleed coral gradient (no rounded corners — platform masks it).
+       Fish scaled to ~76% so it sits inside the 80% safe zone on aggressive circle/squircle masks. -->
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#FF6B6B"/>
+      <stop offset="100%" stop-color="#FF8E72"/>
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" fill="url(#bg)"/>
+
+  <g transform="translate(256,262) scale(2.0)">
+    <!-- Tail -->
+    <polygon points="-70,0 -95,-25 -80,0 -95,25" fill="#FFE66D" stroke="#E6CF5A" stroke-width="2"/>
+    <!-- Body -->
+    <ellipse cx="0" cy="0" rx="45" ry="28" fill="#FF8E72" stroke="#E57A5E" stroke-width="2.5"/>
+    <!-- Butt cheeks -->
+    <ellipse cx="38" cy="-12" rx="14" ry="11" fill="#FFB3A7" stroke="#E57A5E" stroke-width="1.5"/>
+    <ellipse cx="38" cy="12" rx="14" ry="11" fill="#FFB3A7" stroke="#E57A5E" stroke-width="1.5"/>
+    <line x1="38" y1="-5" x2="38" y2="5" stroke="#E57A5E" stroke-width="1.5" stroke-linecap="round"/>
+    <!-- Dorsal fin -->
+    <polygon points="-10,-28 5,-52 25,-28" fill="#FFE66D" stroke="#E6CF5A" stroke-width="1.5"/>
+    <!-- Eye -->
+    <circle cx="-28" cy="-8" r="7" fill="white" stroke="#333" stroke-width="1.5"/>
+    <circle cx="-25" cy="-9" r="3.5" fill="#222"/>
+    <circle cx="-23" cy="-11" r="1.5" fill="white"/>
+    <!-- Smile -->
+    <path d="M-48,6 Q-38,16 -28,10" fill="none" stroke="#333" stroke-width="2" stroke-linecap="round"/>
+    <!-- Pectoral fin -->
+    <path d="M-5,15 Q-15,30 5,25" fill="#FFE66D" stroke="#E6CF5A" stroke-width="1.2" fill-opacity="0.8"/>
+  </g>
+</svg>

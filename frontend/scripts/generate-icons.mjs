@@ -1,7 +1,7 @@
 /**
  * Generates PNG PWA icons from SVG sources.
  * Chrome on Android requires PNG — it ignores SVG in the manifest.
- * Run: node scripts/generate-icons.mjs
+ * Run: node scripts/generate-icons.mjs   (also runs as part of `npm run build`)
  */
 import { readFileSync, writeFileSync } from 'fs';
 import { Resvg } from '@resvg/resvg-js';
@@ -12,8 +12,10 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const publicDir = join(__dirname, '..', 'public');
 
 const icons = [
-  { file: 'icon-192.png', svg: 'icon-192.svg', size: 192 },
-  { file: 'icon-512.png', svg: 'icon-512.svg', size: 512 },
+  { file: 'icon-192.png',          svg: 'icon-192.svg',          size: 192 },
+  { file: 'icon-512.png',          svg: 'icon-512.svg',          size: 512 },
+  { file: 'icon-192-maskable.png', svg: 'icon-192-maskable.svg', size: 192 },
+  { file: 'icon-512-maskable.png', svg: 'icon-512-maskable.svg', size: 512 },
 ];
 
 console.log('Generating PWA icons...');

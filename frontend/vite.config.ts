@@ -53,20 +53,42 @@ export default defineConfig({
         background_color: '#FFF8F0',
         display: 'standalone',
         orientation: 'portrait',
-        start_url: '/',
+        // Version start_url + icon URLs with the build hash so the manifest JSON
+        // changes every release. Chrome's WebAPK updater keys off the manifest
+        // content hash: if the manifest is unchanged it never re-fetches icons,
+        // so an old icon snapshot (e.g. the original blue 🐟) sticks forever.
+        // The `?v=` query also busts Cloudflare/nginx edge caches per release.
+        start_url: `/?v=${BUILD_HASH}`,
+        scope: '/',
         icons: [
+          // 'any' — used for splash + standard launcher icon
           {
-            src: '/icon-192.png',
+            src: `/icon-192.png?v=${BUILD_HASH}`,
             sizes: '192x192',
             type: 'image/png',
             purpose: 'any',
           },
           {
-            src: '/icon-512.png',
+            src: `/icon-512.png?v=${BUILD_HASH}`,
             sizes: '512x512',
             type: 'image/png',
             purpose: 'any',
           },
+          // 'maskable' — full-bleed coral so circle/squircle launcher masks
+          // don't clip transparent corners or the fish itself.
+          {
+            src: `/icon-192-maskable.png?v=${BUILD_HASH}`,
+            sizes: '192x192',
+            type: 'image/png',
+            purpose: 'maskable',
+          },
+          {
+            src: `/icon-512-maskable.png?v=${BUILD_HASH}`,
+            sizes: '512x512',
+            type: 'image/png',
+            purpose: 'maskable',
+          },
+          // SVG fallbacks (some browsers, desktop)
           {
             src: '/icon-192.svg',
             sizes: '192x192',
