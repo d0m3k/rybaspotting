@@ -22,7 +22,8 @@ type registerRequest struct {
 	Username    string `json:"username"`
 	Password    string `json:"password"`
 	DisplayName string `json:"display_name"`
-	Captcha     string `json:"captcha"`
+	Captcha     string `json:"captcha"`     // legacy trivia captcha (used when Turnstile not configured)
+	Turnstile   string `json:"turnstile"` // Cloudflare Turnstile token
 }
 
 type loginRequest struct {
@@ -49,18 +50,34 @@ func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Simple captcha — must match one of the configured answers
-	answer := strings.ToLower(strings.TrimSpace(req.Captcha))
-	valid := false
-	for _, a := range h.Cfg.CaptchaAnswers {
-		if answer == a {
-			valid = true
-			break
+	// Bot protection on registration.
+	// When Turnstile is configured (secret set), a verified token is required —
+	// the legacy trivia captcha is bypassable by any script that knows one word.
+	// Otherwise fall back to the trivia captcha so local/dev still works.
+	if h.Cfg.TurnstileSecret != "" {
+		ok, err := VerifyTurnstile(h.Cfg.TurnstileSecret, req.Turnstile, r.RemoteAddr)
+		if err != nil {
+			log.Printf("[AUTH] turnstile verify error for user=%s: %v", req.Username, err)
+			http.Error(w, `{"error":"captcha verification failed"}`, http.StatusInternalServerError)
+			return
 		}
-	}
-	if !valid {
-		http.Error(w, `{"error":"wrong answer to the ryba question"}`, http.StatusBadRequest)
-		return
+		if !ok {
+			http.Error(w, `{"error":"captcha verification failed"}`, http.StatusBadRequest)
+			return
+		}
+	} else {
+		answer := strings.ToLower(strings.TrimSpace(req.Captcha))
+		valid := false
+		for _, a := range h.Cfg.CaptchaAnswers {
+			if answer == a {
+				valid = true
+				break
+			}
+		}
+		if !valid {
+			http.Error(w, `{"error":"wrong answer to the ryba question"}`, http.StatusBadRequest)
+			return
+		}
 	}
 
 	hash, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)

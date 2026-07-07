@@ -34,10 +34,10 @@ async function request<T>(path: string, opts: RequestOptions = {}): Promise<T> {
 
 export const api = {
   // Auth
-  register: (username: string, password: string, displayName: string, captcha: string) =>
+  register: (username: string, password: string, displayName: string, captcha: string, turnstile?: string) =>
     request('/api/auth/register', {
       method: 'POST',
-      body: JSON.stringify({ username, password, display_name: displayName, captcha }),
+      body: JSON.stringify({ username, password, display_name: displayName, captcha, turnstile }),
     }),
 
   login: (username: string, password: string) =>
@@ -48,7 +48,7 @@ export const api = {
 
   // Config
   getConfig: () =>
-    request<{ allow_gallery_upload: boolean }>('/api/config'),
+    request<{ allow_gallery_upload: boolean; turnstile_site_key?: string }>('/api/config'),
 
   // Fish
   listFish: (page = 1, limit = 50) =>

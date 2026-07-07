@@ -17,6 +17,16 @@ type Config struct {
 	MaxPhotoWidth      int
 	CaptchaAnswers     []string
 
+	// Turnstile (Cloudflare). When Secret is non-empty, registration requires a
+	// verified Turnstile token instead of the trivia captcha (which is trivially
+	// bypassable by bots). SiteKey is public — exposed to the frontend via /api/config.
+	TurnstileSiteKey string
+	TurnstileSecret  string
+
+	// MaxFishPerDay caps how many spots a single user can upload per rolling 24h,
+	// to prevent a single bot account from running up R2 storage/Class-A bills.
+	MaxFishPerDay int
+
 	// R2 / S3-compatible storage (optional — falls back to local disk if empty)
 	R2Endpoint       string
 	R2AccessKeyID    string
@@ -39,6 +49,13 @@ func Load() *Config {
 		MaxPhotoWidth:      getEnvInt("MAX_PHOTO_WIDTH", 1200),
 		CaptchaAnswers:     getEnvList("CAPTCHA_ANSWERS", []string{"dupom", "dupą", "dupa"}),
 		allowGalleryUpload: getEnvBool("ALLOW_GALLERY_UPLOAD", false),
+
+		// Turnstile is opt-in: set both keys in the environment (or .env) to enable.
+		TurnstileSiteKey: getEnv("TURNSTILE_SITE_KEY", ""),
+		TurnstileSecret:  getEnv("TURNSTILE_SECRET", ""),
+
+		// Default 300 fish/user/day — generous for real use, hard cap on abuse.
+		MaxFishPerDay: getEnvInt("MAX_FISH_PER_DAY", 300),
 
 		// R2 / S3-compatible storage (all empty = use local disk)
 		R2Endpoint:        getEnv("R2_ENDPOINT", ""),

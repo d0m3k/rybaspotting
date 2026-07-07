@@ -31,6 +31,24 @@ type FishHandler struct {
 func (h *FishHandler) Create(w http.ResponseWriter, r *http.Request) {
 	userID, _ := r.Context().Value(middleware.ContextUserID).(int)
 
+	// Per-user daily quota — hard cap on how many spots one account can upload in
+	// a rolling 24h window. Prevents a single bot account from running up R2
+	// storage / Class-A write-op bills. Checked up front (before image decode) so
+	// an over-quota request costs almost nothing server-side.
+	var todayCount int
+	if err := h.DB.QueryRow(
+		`SELECT COUNT(*) FROM fish WHERE spotted_by = $1 AND created_at > NOW() - INTERVAL '24 hours'`,
+		userID,
+	).Scan(&todayCount); err != nil {
+		log.Printf("[FISH] daily-quota count error user_id=%d: %v", userID, err)
+		// Fail closed? No — a DB hiccup shouldn't lock out real users. Log and proceed.
+	} else if todayCount >= h.Cfg.MaxFishPerDay {
+		log.Printf("[FISH] daily-quota hit user_id=%d count=%d limit=%d", userID, todayCount, h.Cfg.MaxFishPerDay)
+		w.Header().Set("Retry-After", "3600")
+		http.Error(w, `{"error":"daily fish limit reached — try again tomorrow"}`, http.StatusTooManyRequests)
+		return
+	}
+
 	// Check upload mode
 	if !h.Cfg.AllowGalleryUpload() {
 		// Only allow "live capture" — the frontend should set this header
@@ -330,9 +348,15 @@ func (h *FishHandler) Nearby(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *FishHandler) Config(w http.ResponseWriter, r *http.Request) {
-	writeJSON(w, http.StatusOK, map[string]bool{
+	resp := map[string]any{
 		"allow_gallery_upload": h.Cfg.AllowGalleryUpload(),
-	})
+	}
+	// Only advertise the site key when Turnstile is actually enabled (secret set),
+	// so the frontend knows whether to render the widget or the trivia captcha.
+	if h.Cfg.TurnstileSecret != "" && h.Cfg.TurnstileSiteKey != "" {
+		resp["turnstile_site_key"] = h.Cfg.TurnstileSiteKey
+	}
+	writeJSON(w, http.StatusOK, resp)
 }
 
 // DeleteMyFish deletes a fish entry by ID. Only the original spotter can delete it.
