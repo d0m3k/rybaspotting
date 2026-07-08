@@ -49,8 +49,9 @@ function fishMarkerIcon(fish: any, userId: number | undefined, collectedIds: Set
   return makeFishIcon('#FF8E72', '#C0392B', '#FF6B6B', '#FFB3A7');
 }
 
-export function MapPage({ onStatsChanged, userId, username }: { onStatsChanged?: () => void; userId?: number; username?: string }) {
+export function MapPage({ onStatsChanged, userId, username, dark }: { onStatsChanged?: () => void; userId?: number; username?: string; dark?: boolean }) {
   const mapRef = useRef<L.Map | null>(null);
+  const tileRef = useRef<L.TileLayer | null>(null);
   const markersRef = useRef<L.Marker[]>([]);
   const [fishList, setFishList] = useState<any[]>([]);
   const [selectedFish, setSelectedFish] = useState<any | null>(null);
@@ -61,9 +62,6 @@ export function MapPage({ onStatsChanged, userId, username }: { onStatsChanged?:
 
   useEffect(() => {
     const map = L.map('map').setView([50.0647, 19.9450], 13);
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      attribution: '&copy; OpenStreetMap contributors',
-    }).addTo(map);
     mapRef.current = map;
 
     loadFish();
@@ -73,6 +71,33 @@ export function MapPage({ onStatsChanged, userId, username }: { onStatsChanged?:
       map.remove();
     };
   }, []);
+
+  // Tile layer follows the app dark mode. CartoDB provides free OSM-based dark
+  // tiles; light uses the standard OSM layer. Swapping rather than CSS-filtering
+  // keeps the fish markers/popups at their designed colours.
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+    if (tileRef.current) {
+      map.removeLayer(tileRef.current);
+      tileRef.current = null;
+    }
+    const url = dark
+      ? 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png'
+      : 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png';
+    const attr = dark
+      ? '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>'
+      : '&copy; OpenStreetMap contributors';
+    const tile = L.tileLayer(url, { attribution: attr, maxZoom: 19 });
+    tile.addTo(map);
+    tileRef.current = tile;
+    return () => {
+      if (tileRef.current) {
+        map.removeLayer(tileRef.current);
+        tileRef.current = null;
+      }
+    };
+  }, [dark]);
 
   useEffect(() => {
     // Rebuild markers when the relationship set changes

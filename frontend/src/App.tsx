@@ -146,7 +146,7 @@ export function App() {
       )}
 
       <div class="app-content">
-        {page === 'map' && <MapPage onStatsChanged={refreshStats} userId={auth.userId} username={auth.username} />}
+        {page === 'map' && <MapPage onStatsChanged={refreshStats} userId={auth.userId} username={auth.username} dark={dark} />}
         {page === 'spot' && <SpotPage onHideNav={setHideNav} onStatsChanged={refreshStats} />}
         {page === 'upload' && allowUpload && <UploadPage onStatsChanged={refreshStats} />}
         {page === 'leaderboard' && <LeaderboardPage />}
