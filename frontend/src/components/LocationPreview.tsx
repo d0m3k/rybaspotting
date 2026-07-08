@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'preact/hooks';
 import L from 'leaflet';
 import { reverseGeocode, ReverseGeoResult } from '../geocode';
+import { mapTiles, appDark } from '../mapStyle';
 
 interface Props {
   lat: number;
@@ -41,9 +42,8 @@ export function LocationPreview({ lat, lng, onChange, onAddress }: Props) {
       keyboard: false,
     }).setView([lat, lng], 16);
 
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      attribution: '&copy; OSM',
-    }).addTo(map);
+    const opts = mapTiles(appDark());
+    L.tileLayer(opts.url, { attribution: opts.attribution, maxZoom: opts.maxZoom }).addTo(map);
 
     // Add crosshair marker
     L.marker([lat, lng], {

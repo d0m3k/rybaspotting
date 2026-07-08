@@ -4,6 +4,7 @@ import 'leaflet/dist/leaflet.css';
 import { api } from '../api';
 import { distanceMeters } from '../distance';
 import { loadAuth } from '../stores/auth';
+import { mapTiles } from '../mapStyle';
 
 // Fix Leaflet default icon issue
 delete (L.Icon.Default.prototype as any)._getIconUrl;
@@ -72,9 +73,10 @@ export function MapPage({ onStatsChanged, userId, username, dark }: { onStatsCha
     };
   }, []);
 
-  // Tile layer follows the app dark mode. CartoDB provides free OSM-based dark
-  // tiles; light uses the standard OSM layer. Swapping rather than CSS-filtering
-  // keeps the fish markers/popups at their designed colours.
+  // Tile layer follows the app dark mode. CARTO Positron (light) and Dark Matter
+  // (dark) are the same generalist style in two themes, so the two modes look
+  // like one design — not two unrelated maps. Swapping the layer (rather than
+  // CSS-inverting) keeps the fish markers/popups at their designed colours.
   useEffect(() => {
     const map = mapRef.current;
     if (!map) return;
@@ -82,13 +84,8 @@ export function MapPage({ onStatsChanged, userId, username, dark }: { onStatsCha
       map.removeLayer(tileRef.current);
       tileRef.current = null;
     }
-    const url = dark
-      ? 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png'
-      : 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png';
-    const attr = dark
-      ? '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>'
-      : '&copy; OpenStreetMap contributors';
-    const tile = L.tileLayer(url, { attribution: attr, maxZoom: 19 });
+    const opts = mapTiles(!!dark);
+    const tile = L.tileLayer(opts.url, { attribution: opts.attribution, maxZoom: opts.maxZoom });
     tile.addTo(map);
     tileRef.current = tile;
     return () => {

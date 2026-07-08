@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, useCallback } from 'preact/hooks';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { reverseGeocode } from '../geocode';
+import { mapTiles, appDark } from '../mapStyle';
 
 delete (L.Icon.Default.prototype as any)._getIconUrl;
 L.Icon.Default.mergeOptions({
@@ -22,6 +23,7 @@ interface Props {
 
 export function LocationPicker({ initialLat, initialLng, onConfirm, onCancel, limitCenter, limitRadiusM }: Props) {
   const mapRef = useRef<L.Map | null>(null);
+  const tileRef = useRef<L.TileLayer | null>(null);
   const circleRef = useRef<L.Circle | null>(null);
   const centerRef = useRef({ lat: initialLat || 50.0647, lng: initialLng || 19.9450 });
   const [address, setAddress] = useState('');
@@ -40,10 +42,12 @@ export function LocationPicker({ initialLat, initialLng, onConfirm, onCancel, li
       zoomControl: false,
       attributionControl: false,
     }).setView([c.lat, c.lng], 16);
+    mapRef.current = map;
 
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      attribution: '&copy; OSM',
-    }).addTo(map);
+    const opts = mapTiles(appDark());
+    const tile = L.tileLayer(opts.url, { attribution: opts.attribution, maxZoom: opts.maxZoom });
+    tile.addTo(map);
+    tileRef.current = tile;
 
     // Draw the limit circle if specified
     if (limitCenter && limitRadiusM) {
@@ -70,6 +74,24 @@ export function LocationPicker({ initialLat, initialLng, onConfirm, onCancel, li
 
     return () => map.remove();
   }, [resolve, limitCenter, limitRadiusM]);
+
+  // Re-tile when the app theme changes while the picker is open (toggle on the
+  // map page then opening the picker, or vice versa). Observes the <html> class.
+  useEffect(() => {
+    const root = document.documentElement;
+    const apply = () => {
+      const map = mapRef.current;
+      if (!map) return;
+      if (tileRef.current) { map.removeLayer(tileRef.current); tileRef.current = null; }
+      const opts = mapTiles(appDark());
+      const tile = L.tileLayer(opts.url, { attribution: opts.attribution, maxZoom: opts.maxZoom });
+      tile.addTo(map);
+      tileRef.current = tile;
+    };
+    const obs = new MutationObserver(apply);
+    obs.observe(root, { attributes: true, attributeFilter: ['class'] });
+    return () => obs.disconnect();
+  }, []);
 
   const c = centerRef.current;
   const hasLimit = !!(limitCenter && limitRadiusM);
