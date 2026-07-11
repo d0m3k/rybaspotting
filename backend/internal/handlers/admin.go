@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"log"
+	"math"
 	"net/http"
 	"strconv"
 	"strings"
@@ -419,6 +420,250 @@ func (h *AdminHandler) ListCollections(w http.ResponseWriter, r *http.Request) {
 	}
 
 	writeJSON(w, http.StatusOK, result)
+}
+
+type updateFishLocationRequest struct {
+	Latitude    *float64 `json:"latitude"`
+	Longitude   *float64 `json:"longitude"`
+	AddressHint *string  `json:"address_hint"`
+}
+
+// UpdateFishLocation lets an admin fix the location or address hint of an existing fish.
+func (h *AdminHandler) UpdateFishLocation(w http.ResponseWriter, r *http.Request) {
+	idStr := chi.URLParam(r, "id")
+	id, err := strconv.Atoi(idStr)
+	if err != nil {
+		http.Error(w, `{"error":"invalid fish id"}`, http.StatusBadRequest)
+		return
+	}
+
+	var req updateFishLocationRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, `{"error":"invalid request body"}`, http.StatusBadRequest)
+		return
+	}
+
+	// At least one field must be provided
+	if req.Latitude == nil && req.Longitude == nil && req.AddressHint == nil {
+		http.Error(w, `{"error":"at least one of latitude, longitude, or address_hint is required"}`, http.StatusBadRequest)
+		return
+	}
+
+	// Validate coords if provided
+	if req.Latitude != nil && (math.IsNaN(*req.Latitude) || math.IsInf(*req.Latitude, 0) || *req.Latitude < -90 || *req.Latitude > 90) {
+		http.Error(w, `{"error":"invalid latitude"}`, http.StatusBadRequest)
+		return
+	}
+	if req.Longitude != nil && (math.IsNaN(*req.Longitude) || math.IsInf(*req.Longitude, 0) || *req.Longitude < -180 || *req.Longitude > 180) {
+		http.Error(w, `{"error":"invalid longitude"}`, http.StatusBadRequest)
+		return
+	}
+
+	// Check fish exists
+	var currentLat, currentLng float64
+	var currentAddr string
+	err = h.DB.QueryRow(`SELECT latitude, longitude, address_hint FROM fish WHERE id = $1`, id).Scan(&currentLat, &currentLng, &currentAddr)
+	if err == sql.ErrNoRows {
+		http.Error(w, `{"error":"fish not found"}`, http.StatusNotFound)
+		return
+	}
+	if err != nil {
+		http.Error(w, `{"error":"internal error"}`, http.StatusInternalServerError)
+		return
+	}
+
+	// Update only provided fields
+	newLat := currentLat
+	newLng := currentLng
+	newAddr := currentAddr
+	if req.Latitude != nil {
+		newLat = *req.Latitude
+	}
+	if req.Longitude != nil {
+		newLng = *req.Longitude
+	}
+	if req.AddressHint != nil {
+		newAddr = *req.AddressHint
+	}
+
+	_, err = h.DB.Exec(`UPDATE fish SET latitude = $1, longitude = $2, address_hint = $3 WHERE id = $4`,
+		newLat, newLng, newAddr, id)
+	if err != nil {
+		http.Error(w, `{"error":"internal error"}`, http.StatusInternalServerError)
+		return
+	}
+
+	adminID, _ := r.Context().Value(middleware.ContextUserID).(int)
+	log.Printf("[ADMIN] type=update_fish_location admin_id=%d fish_id=%d lat=%.5f->%.5f lng=%.5f->%.5f",
+		adminID, id, currentLat, newLat, currentLng, newLng)
+
+	writeJSON(w, http.StatusOK, map[string]interface{}{
+		"message":      "fish location updated",
+		"latitude":     newLat,
+		"longitude":    newLng,
+		"address_hint": newAddr,
+	})
+}
+
+type mergeCandidate struct {
+	models.Fish
+	DistanceMeters float64 `json:"distance_meters"`
+}
+
+// MergeCandidates returns fish near the given fish, sorted by distance, for admin merge selection.
+func (h *AdminHandler) MergeCandidates(w http.ResponseWriter, r *http.Request) {
+	idStr := chi.URLParam(r, "id")
+	id, err := strconv.Atoi(idStr)
+	if err != nil {
+		http.Error(w, `{"error":"invalid fish id"}`, http.StatusBadRequest)
+		return
+	}
+
+	// Get the source fish location
+	var srcLat, srcLng float64
+	err = h.DB.QueryRow(`SELECT latitude, longitude FROM fish WHERE id = $1`, id).Scan(&srcLat, &srcLng)
+	if err == sql.ErrNoRows {
+		http.Error(w, `{"error":"fish not found"}`, http.StatusNotFound)
+		return
+	}
+	if err != nil {
+		http.Error(w, `{"error":"internal error"}`, http.StatusInternalServerError)
+		return
+	}
+
+	// Find all other fish, compute distance, sort by distance
+	// Use a generous bounding box (approx 500 km) and limit to 50 candidates
+	rows, err := h.DB.Query(`
+		SELECT f.id, f.photo_filename, f.latitude, f.longitude, f.address_hint,
+		       f.spotted_by, COALESCE(NULLIF(u.display_name, ''), u.username), f.created_at,
+		       2 * 6371000 * asin(sqrt(
+		         pow(sin(radians(f.latitude  - $1) / 2), 2)
+		       + cos(radians($1)) * cos(radians(f.latitude)) * pow(sin(radians(f.longitude - $2) / 2), 2)
+		       )) AS distance
+		FROM fish f
+		JOIN users u ON u.id = f.spotted_by
+		WHERE f.id != $3
+		ORDER BY distance ASC
+		LIMIT 50
+	`, srcLat, srcLng, id)
+	if err != nil {
+		log.Printf("[ADMIN] MergeCandidates query error: %v", err)
+		http.Error(w, `{"error":"internal error"}`, http.StatusInternalServerError)
+		return
+	}
+	defer rows.Close()
+
+	candidates := []mergeCandidate{}
+	for rows.Next() {
+		var mc mergeCandidate
+		if err := rows.Scan(&mc.ID, &mc.PhotoFilename, &mc.Latitude, &mc.Longitude,
+			&mc.AddressHint, &mc.SpottedBy, &mc.SpotterName, &mc.CreatedAt,
+			&mc.DistanceMeters); err != nil {
+			log.Printf("[ADMIN] MergeCandidates scan error: %v", err)
+			continue
+		}
+		mc.DistanceMeters = math.Round(mc.DistanceMeters*100) / 100
+		if mc.PhotoFilename != "" {
+			mc.PhotoURL = h.Storage.PublicURL(mc.PhotoFilename)
+		}
+		candidates = append(candidates, mc)
+	}
+
+	writeJSON(w, http.StatusOK, candidates)
+}
+
+// MergeFish merges the source fish (id) into the target fish.
+// Collections from source are transferred to target (duplicates skipped).
+// Source fish and its photos are deleted.
+func (h *AdminHandler) MergeFish(w http.ResponseWriter, r *http.Request) {
+	sourceIDStr := chi.URLParam(r, "id")
+	sourceID, err := strconv.Atoi(sourceIDStr)
+	if err != nil {
+		http.Error(w, `{"error":"invalid source fish id"}`, http.StatusBadRequest)
+		return
+	}
+
+	var req struct {
+		TargetID int `json:"target_id"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, `{"error":"invalid request body"}`, http.StatusBadRequest)
+		return
+	}
+	if req.TargetID == 0 {
+		http.Error(w, `{"error":"target_id is required"}`, http.StatusBadRequest)
+		return
+	}
+	if req.TargetID == sourceID {
+		http.Error(w, `{"error":"cannot merge a fish into itself"}`, http.StatusBadRequest)
+		return
+	}
+
+	// Verify both fish exist
+	var sourceFilename string
+	err = h.DB.QueryRow(`SELECT photo_filename FROM fish WHERE id = $1`, sourceID).Scan(&sourceFilename)
+	if err == sql.ErrNoRows {
+		http.Error(w, `{"error":"source fish not found"}`, http.StatusNotFound)
+		return
+	}
+	if err != nil {
+		http.Error(w, `{"error":"internal error"}`, http.StatusInternalServerError)
+		return
+	}
+
+	var targetExists bool
+	h.DB.QueryRow(`SELECT EXISTS(SELECT 1 FROM fish WHERE id = $1)`, req.TargetID).Scan(&targetExists)
+	if !targetExists {
+		http.Error(w, `{"error":"target fish not found"}`, http.StatusNotFound)
+		return
+	}
+
+	// Transfer collections: move all collectors from source to target, skip duplicates (ON CONFLICT DO NOTHING)
+	// First get collection count
+	var collCount int
+	h.DB.QueryRow(`SELECT COUNT(*) FROM collections WHERE fish_id = $1`, sourceID).Scan(&collCount)
+
+	_, err = h.DB.Exec(`
+		INSERT INTO collections (fish_id, user_id, created_at)
+		SELECT $1, c.user_id, c.created_at
+		FROM collections c
+		WHERE c.fish_id = $2
+		ON CONFLICT (fish_id, user_id) DO NOTHING
+	`, req.TargetID, sourceID)
+	if err != nil {
+		log.Printf("[ADMIN] MergeFish transfer collections error: %v", err)
+		http.Error(w, `{"error":"failed to transfer collections"}`, http.StatusInternalServerError)
+		return
+	}
+
+	// Delete source fish from DB (collections cascade)
+	_, err = h.DB.Exec(`DELETE FROM fish WHERE id = $1`, sourceID)
+	if err != nil {
+		http.Error(w, `{"error":"failed to delete source fish"}`, http.StatusInternalServerError)
+		return
+	}
+
+	// Delete source photos from storage
+	if sourceFilename != "" {
+		if err := h.Storage.Delete(sourceFilename); err != nil {
+			log.Printf("[ADMIN] MergeFish: failed to delete photo %s: %v", sourceFilename, err)
+		}
+		thumbFilename := storage.ThumbFilename(sourceFilename)
+		if err := h.Storage.Delete(thumbFilename); err != nil {
+			log.Printf("[ADMIN] MergeFish: failed to delete thumbnail %s: %v", thumbFilename, err)
+		}
+	}
+
+	adminID, _ := r.Context().Value(middleware.ContextUserID).(int)
+	log.Printf("[ADMIN] type=merge_fish admin_id=%d source_id=%d target_id=%d collections_moved=%d",
+		adminID, sourceID, req.TargetID, collCount)
+
+	writeJSON(w, http.StatusOK, map[string]interface{}{
+		"message":           "fish merged",
+		"source_id":         sourceID,
+		"target_id":         req.TargetID,
+		"collections_moved": collCount,
+	})
 }
 
 // DeleteCollection removes a collection entry.

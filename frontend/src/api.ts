@@ -152,6 +152,24 @@ export const api = {
   deleteFish: (id: number) =>
     request(`/api/admin/fish/${id}`, { method: 'DELETE' }),
 
+  // Admin — update fish location / address hint
+  updateFishLocation: (id: number, data: { latitude?: number; longitude?: number; address_hint?: string }) =>
+    request(`/api/admin/fish/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    }),
+
+  // Admin — list merge candidates for a fish (sorted by distance)
+  mergeCandidates: (id: number) =>
+    request<any[]>(`/api/admin/fish/${id}/merge-candidates`),
+
+  // Admin — merge source fish into target fish
+  mergeFish: (sourceId: number, targetId: number) =>
+    request(`/api/admin/fish/${sourceId}/merge`, {
+      method: 'POST',
+      body: JSON.stringify({ target_id: targetId }),
+    }),
+
   // Admin — collections
   listCollections: () =>
     request<any[]>('/api/admin/collections'),
