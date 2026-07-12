@@ -28,61 +28,75 @@ interface FishCluster {
 }
 
 interface EdgeIndicator {
-  latlng: [number, number];
   count: number;
+  x: number;          // anchor px in container coordinates (fixed to viewport)
+  y: number;
+  bearing: number;    // 0=N, clockwise degrees — rotates the arrow
+  center: [number, number];  // centroid of the sector's off-screen fish (to pan to)
 }
 
-/** Grid-based clustering in pixel space at the current zoom level. */
+/** Grid-based clustering anchored to the map's **global** pixel grid at the
+ *  current zoom (via map.project / unproject). Because the grid is anchored
+ *  to the world — not to the screen — panning the map never changes which
+ *  cluster a fish belongs to; only changing the zoom re-evaluates membership.
+ *  This is what stops clusters from fusing/splitting as you scroll around. */
 function clusterFish(
   fishList: any[],
   map: L.Map,
   userId: number | undefined,
   collectedIds: Set<number>,
 ): { clusters: FishCluster[]; singles: any[] } {
-  const grid = new Map<string, any[]>();
+  const zoom = map.getZoom();
+  const grid = new Map<string, { sx: number; sy: number; fish: any[] }>();
 
   for (const f of fishList) {
-    const pt = map.latLngToContainerPoint([f.latitude, f.longitude]);
-    const cx = Math.floor(pt.x / CLUSTER_GRID_PX);
-    const cy = Math.floor(pt.y / CLUSTER_GRID_PX);
+    const g = map.project([f.latitude, f.longitude], zoom); // global px → pan-invariant
+    const cx = Math.floor(g.x / CLUSTER_GRID_PX);
+    const cy = Math.floor(g.y / CLUSTER_GRID_PX);
     const key = `${cx},${cy}`;
-    if (!grid.has(key)) grid.set(key, []);
-    grid.get(key)!.push(f);
+    let cell = grid.get(key);
+    if (!cell) { cell = { sx: 0, sy: 0, fish: [] }; grid.set(key, cell); }
+    cell.sx += g.x;
+    cell.sy += g.y;
+    cell.fish.push(f);
   }
 
   const clusters: FishCluster[] = [];
   const singles: any[] = [];
 
-  for (const [, group] of grid) {
-    if (group.length === 1) {
-      singles.push(group[0]);
-    } else {
-      let sumLat = 0, sumLng = 0;
-      let mine = 0, collected = 0;
-      for (const f of group) {
-        sumLat += f.latitude;
-        sumLng += f.longitude;
-        if (userId != null && f.spotted_by === userId) mine++;
-        else if (collectedIds.has(f.id)) collected++;
-      }
-      clusters.push({
-        center: [sumLat / group.length, sumLng / group.length],
-        fish: group,
-        count: group.length,
-        mine,
-        collected,
-        toCollect: group.length - mine - collected,
-      });
+  for (const cell of grid.values()) {
+    if (cell.fish.length === 1) {
+      singles.push(cell.fish[0]);
+      continue;
     }
+    const centerPx = L.point(cell.sx / cell.fish.length, cell.sy / cell.fish.length);
+    const centerLatLng = map.unproject(centerPx, zoom);
+    let mine = 0, collected = 0;
+    for (const f of cell.fish) {
+      if (userId != null && f.spotted_by === userId) mine++;
+      else if (collectedIds.has(f.id)) collected++;
+    }
+    clusters.push({
+      center: [centerLatLng.lat, centerLatLng.lng],
+      fish: cell.fish,
+      count: cell.fish.length,
+      mine,
+      collected,
+      toCollect: cell.fish.length - mine - collected,
+    });
   }
 
   return { clusters, singles };
 }
 
-/** Compute off-screen indicators — one per 45° sector, snapped to a fixed
- *  position on the viewport edge so they don't jitter while panning. */
+/** Compute off-screen fish indicators — one per 45° sector. The indicators are
+ *  positioned at fixed pixels on the viewport border (NOT tied to a latlng),
+ *  so they stay pinned to the screen edges and never slide or jitter while
+ *  panning. Each one carries the centroid of its sector's fish so tapping it
+ *  pans the map in that direction. */
 function computeEdgeIndicators(fishList: any[], map: L.Map): EdgeIndicator[] {
   const bounds = map.getBounds();
+  const size = map.getSize();
   const pad = 0.0005;
   const south = bounds.getSouth() + pad;
   const north = bounds.getNorth() - pad;
@@ -108,26 +122,35 @@ function computeEdgeIndicators(fishList: any[], map: L.Map): EdgeIndicator[] {
     sectors.get(sector)!.push(f);
   }
 
-  // Snap each sector to a fixed anchor point on the viewport border.
-  // 0=N mid-top, 1=NE top-right, 2=E mid-right, 3=SE bottom-right,
-  // 4=S mid-bottom, 5=SW bottom-left, 6=W mid-left, 7=NW top-left.
-  const midLat = (south + north) / 2;
-  const midLng = (west + east) / 2;
-  const anchors: [number, number][] = [
-    [north, midLng],       // 0 N
-    [north, east],          // 1 NE
-    [midLat, east],         // 2 E
-    [south, east],          // 3 SE
-    [south, midLng],        // 4 S
-    [south, west],          // 5 SW
-    [midLat, west],         // 6 W
-    [north, west],          // 7 NW
+  // Fixed viewport anchor px for each sector, inset from the border so the
+  // pills don't sit under the zoom controls, legend, or attribution.
+  const w = size.x;
+  const h = size.y;
+  const Ix = 40;   // horizontal inset
+  const Iy = 44;   // vertical inset (clears top legend + zoom bar)
+  const anchors: { x: number; y: number }[] = [
+    { x: w / 2,      y: Iy },       // 0 N
+    { x: w - Ix,    y: Iy },       // 1 NE
+    { x: w - Ix,    y: h / 2 },    // 2 E
+    { x: w - Ix,    y: h - Iy },   // 3 SE
+    { x: w / 2,      y: h - Iy },   // 4 S
+    { x: Ix,         y: h - Iy },   // 5 SW
+    { x: Ix,         y: h / 2 },    // 6 W
+    { x: Ix,         y: Iy },       // 7 NW
   ];
 
   const indicators: EdgeIndicator[] = [];
   for (const [sector, group] of sectors) {
-    const anchor = anchors[sector] || [midLat, midLng];
-    indicators.push({ latlng: anchor, count: group.length });
+    const anchor = anchors[sector] || { x: w / 2, y: h / 2 };
+    let sumLat = 0, sumLng = 0;
+    for (const f of group) { sumLat += f.latitude; sumLng += f.longitude; }
+    indicators.push({
+      count: group.length,
+      x: anchor.x,
+      y: anchor.y,
+      bearing: sector * 45,
+      center: [sumLat / group.length, sumLng / group.length],
+    });
   }
 
   return indicators;
@@ -256,28 +279,6 @@ function makeClusterIcon(cl: FishCluster): L.DivIcon {
   });
 }
 
-/** Edge indicator — teal arrow marker pointing towards off-screen fish. */
-function makeEdgeIcon(count: number): L.DivIcon {
-  const size = 30;
-  const html = `<div style="
-    width:${size}px;height:${size}px;
-    background:rgba(78,205,196,0.92);
-    border:2px solid #fff;
-    border-radius:50%;
-    display:flex;align-items:center;justify-content:center;
-    color:#fff;font-size:11px;font-weight:700;
-    box-shadow:0 1px 6px rgba(0,0,0,0.3);
-    font-family:-apple-system,BlinkMacSystemFont,sans-serif;
-  ">${count}</div>`;
-
-  return L.divIcon({
-    className: 'edge-arrow-icon',
-    html,
-    iconSize: [size, size],
-    iconAnchor: [size / 2, size / 2],
-  });
-}
-
 const CLUSTER_PAGE_SIZE = 5;
 
 export function MapPage({ onStatsChanged, userId, username, dark }: { onStatsChanged?: () => void; userId?: number; username?: string; dark?: boolean }) {
@@ -295,6 +296,10 @@ export function MapPage({ onStatsChanged, userId, username, dark }: { onStatsCha
   const [clusterDetail, setClusterDetail] = useState<FishCluster | null>(null);
   const [clusterPage, setClusterPage] = useState(0);
   const [hasLocation, setHasLocation] = useState(false);
+  const [edgeIndicators, setEdgeIndicators] = useState<EdgeIndicator[]>([]);
+  const locMarkerRef = useRef<L.Marker | null>(null);
+  const locCircleRef = useRef<L.Circle | null>(null);
+  const lastLocRef = useRef<L.LatLng | null>(null);
 
   useEffect(() => {
     const map = L.map('map').setView([50.0647, 19.9450], 13);
@@ -335,15 +340,50 @@ export function MapPage({ onStatsChanged, userId, username, dark }: { onStatsCha
     const map = mapRef.current;
     if (!map) return;
 
-    // Start watching position — Leaflet draws the blue dot automatically
+    // Start watching position. NOTE: Leaflet's built-in map.locate() only
+    // fires events — it does NOT draw a marker. We draw the blue dot ourselves
+    // on `locationfound` (pulsing dot + accuracy halo) and clear it on error.
     map.locate({ watch: true, enableHighAccuracy: true, timeout: 10000 });
 
-    const onLocationFound = () => setHasLocation(true);
-    const onLocationError = () => setHasLocation(false);
+    const onLocationFound = (e: any) => {
+      setHasLocation(true);
+      const latlng: L.LatLng = e.latlng;
+      lastLocRef.current = latlng;
+
+      // Accuracy halo (meters)
+      if (locCircleRef.current) locCircleRef.current.remove();
+      locCircleRef.current = L.circle(latlng, {
+        radius: e.accuracy,
+        color: '#4ecdc4',
+        weight: 1,
+        fillColor: '#4ecdc4',
+        fillOpacity: 0.12,
+        interactive: false,
+      }).addTo(map);
+
+      // Pulsing location dot
+      if (locMarkerRef.current) locMarkerRef.current.remove();
+      locMarkerRef.current = L.marker(latlng, {
+        icon: L.divIcon({
+          className: 'map-loc-icon',
+          html: '<div class="map-loc-dot"><span class="map-loc-pulse"></span></div>',
+          iconSize: [18, 18],
+          iconAnchor: [9, 9],
+        }),
+        interactive: false,
+        keyboard: false,
+      }).addTo(map);
+    };
+    const onLocationError = () => {
+      setHasLocation(false);
+      if (locMarkerRef.current) { locMarkerRef.current.remove(); locMarkerRef.current = null; }
+      if (locCircleRef.current) { locCircleRef.current.remove(); locCircleRef.current = null; }
+    };
     map.on('locationfound', onLocationFound);
     map.on('locationerror', onLocationError);
 
-    // Custom recenter control below the zoom buttons
+    // Custom recenter control placed under the zoom +/− buttons (topleft),
+    // so it sits where users expect it instead of floating in the corner.
     const RecenterControl = L.Control.extend({
       onAdd: function () {
         const btn = L.DomUtil.create('button', 'map-recenter-btn');
@@ -351,18 +391,26 @@ export function MapPage({ onStatsChanged, userId, username, dark }: { onStatsCha
         btn.title = 'Pokaż moją lokalizację';
         L.DomEvent.on(btn, 'click', function (e: Event) {
           L.DomEvent.stopPropagation(e);
-          map.locate({ setView: true, enableHighAccuracy: true, timeout: 8000 });
+          // If we already have a fix, jump there instantly; otherwise trigger
+          // a one-shot high-accuracy locate that sets the view.
+          if (lastLocRef.current) {
+            map.setView(lastLocRef.current, Math.max(map.getZoom(), 16), { animate: true });
+          } else {
+            map.locate({ setView: true, enableHighAccuracy: true, timeout: 8000 });
+          }
         });
         return btn;
       },
     });
-    const ctrl = new RecenterControl({ position: 'bottomright' });
+    const ctrl = new RecenterControl({ position: 'topleft' });
     map.addControl(ctrl);
 
     return () => {
       map.off('locationfound', onLocationFound);
       map.off('locationerror', onLocationError);
       map.removeControl(ctrl);
+      if (locMarkerRef.current) { locMarkerRef.current.remove(); locMarkerRef.current = null; }
+      if (locCircleRef.current) { locCircleRef.current.remove(); locCircleRef.current = null; }
     };
   }, []);
 
@@ -416,19 +464,16 @@ export function MapPage({ onStatsChanged, userId, username, dark }: { onStatsCha
       markersRef.current.push(marker);
     }
 
-    // Render edge indicators for off-screen fish
-    const indicators = computeEdgeIndicators(fishList, map);
-    for (const ind of indicators) {
-      const marker = L.marker(ind.latlng, {
-        icon: makeEdgeIcon(ind.count),
-        interactive: false,
-        keyboard: false,
-      }).addTo(map);
-      markersRef.current.push(marker);
-    }
+    // Off-screen fish are shown as fixed viewport-pinned pills (see JSX).
+    // Storing them in state keeps them out of Leaflet's moving marker pane,
+    // so they never slide/jitter while dragging — only counts update on
+    // moveend/zoomend. Tapping one pans toward that sector's fish.
+    setEdgeIndicators(computeEdgeIndicators(fishList, map));
   }, [fishList, userId, collectedFishIds]);
 
-  // Re-cluster when map moves or zooms (debounced via moveend/zoomend)
+  // Re-cluster when map moves or zooms (debounced via moveend/zoomend).
+  // Because clustering is world-anchored, moveend only changes which markers
+  // are in view — cluster membership stays identical, so nothing jumps.
   useEffect(() => {
     const map = mapRef.current;
     if (!map) return;
@@ -436,10 +481,12 @@ export function MapPage({ onStatsChanged, userId, username, dark }: { onStatsCha
     const onViewChange = () => renderAllMarkers();
     map.on('moveend', onViewChange);
     map.on('zoomend', onViewChange);
+    map.on('resize', onViewChange);
 
     return () => {
       map.off('moveend', onViewChange);
       map.off('zoomend', onViewChange);
+      map.off('resize', onViewChange);
     };
   }, [renderAllMarkers]);
 
@@ -546,6 +593,32 @@ export function MapPage({ onStatsChanged, userId, username, dark }: { onStatsCha
         <span class="map-legend-item"><span class="map-legend-dot" style="background:#FFE66D;border-color:#D4AC0D;"></span> Twoja</span>
         <span class="map-legend-item"><span class="map-legend-dot" style="background:#58D68D;border-color:#1E8449;"></span> zebrana</span>
       </div>
+
+      {/* ── Off-screen fish indicators (fixed to the viewport) ─────── */}
+      <div class="map-edge-layer">
+        {edgeIndicators.map((ind, i) => (
+          <button
+            key={i}
+            class="map-edge-indicator"
+            style={{ left: `${ind.x}px`, top: `${ind.y}px` }}
+            title={`Pokaż ryby w tym kierunku (${ind.count})`}
+            onClick={() => {
+              const m = mapRef.current;
+              if (m) m.panTo(ind.center, { animate: true });
+            }}
+          >
+            <span class="map-edge-arrow" style={{ transform: `rotate(${ind.bearing - 90}deg)` }}>▶</span>
+            {ind.count}
+          </button>
+        ))}
+      </div>
+
+      {/* ── GPS hint if we couldn't get a fix ───────────────────────── */}
+      {!hasLocation && !loading && (
+        <div class="map-loc-hint">
+          📍 Włącz GPS, aby zobaczyć swoją pozycję
+        </div>
+      )}
 
       {/* ── Cluster detail bottom sheet ─────────────────────────────── */}
       {clusterDetail && (
