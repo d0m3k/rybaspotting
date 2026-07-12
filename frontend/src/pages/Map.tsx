@@ -22,6 +22,9 @@ interface FishCluster {
   center: [number, number];
   fish: any[];
   count: number;
+  mine: number;
+  collected: number;
+  toCollect: number;
 }
 
 interface EdgeIndicator {
@@ -30,7 +33,12 @@ interface EdgeIndicator {
 }
 
 /** Grid-based clustering in pixel space at the current zoom level. */
-function clusterFish(fishList: any[], map: L.Map): { clusters: FishCluster[]; singles: any[] } {
+function clusterFish(
+  fishList: any[],
+  map: L.Map,
+  userId: number | undefined,
+  collectedIds: Set<number>,
+): { clusters: FishCluster[]; singles: any[] } {
   const grid = new Map<string, any[]>();
 
   for (const f of fishList) {
@@ -50,11 +58,20 @@ function clusterFish(fishList: any[], map: L.Map): { clusters: FishCluster[]; si
       singles.push(group[0]);
     } else {
       let sumLat = 0, sumLng = 0;
-      for (const f of group) { sumLat += f.latitude; sumLng += f.longitude; }
+      let mine = 0, collected = 0;
+      for (const f of group) {
+        sumLat += f.latitude;
+        sumLng += f.longitude;
+        if (userId != null && f.spotted_by === userId) mine++;
+        else if (collectedIds.has(f.id)) collected++;
+      }
       clusters.push({
         center: [sumLat / group.length, sumLng / group.length],
         fish: group,
         count: group.length,
+        mine,
+        collected,
+        toCollect: group.length - mine - collected,
       });
     }
   }
@@ -146,25 +163,83 @@ function fishMarkerIcon(fish: any, userId: number | undefined, collectedIds: Set
   return makeFishIcon('#FF8E72', '#C0392B', '#FF6B6B', '#FFB3A7');
 }
 
-/** Cluster marker — a circle with the fish count. Size grows with count. */
-function makeClusterIcon(count: number): L.DivIcon {
-  let size = 42;
+/** Cluster marker — a pie/donut chart showing the color mix of fish types inside.
+ *  Outer ring = proportion of mine / collected / to-collect.
+ *  White centre circle holds the total count. Pure single-type groups use a
+ *  solid fill instead of a pie for a cleaner look. */
+function makeClusterIcon(cl: FishCluster): L.DivIcon {
+  let size = 46;
   let fontSize = 15;
-  if (count >= 10) { size = 50; fontSize = 16; }
-  if (count >= 25) { size = 58; fontSize = 18; }
-  if (count >= 100) { size = 64; fontSize = 16; }
+  if (cl.count >= 10) { size = 54; fontSize = 16; }
+  if (cl.count >= 25) { size = 62; fontSize = 18; }
+  if (cl.count >= 100) { size = 70; fontSize = 16; }
 
-  const html = `<div style="
-    width:${size}px;height:${size}px;
-    background:linear-gradient(135deg,#FF6B6B,#FF8E72);
-    border:3px solid #fff;
-    border-radius:50%;
-    display:flex;align-items:center;justify-content:center;
-    color:#fff;font-weight:700;font-size:${fontSize}px;
-    box-shadow:0 2px 8px rgba(0,0,0,0.3);
-    filter:drop-shadow(0 2px 3px rgba(0,0,0,0.35));
-    font-family:-apple-system,BlinkMacSystemFont,sans-serif;
-  ">${count}</div>`;
+  const cx = size / 2, cy = size / 2;
+  const outerR = size / 2 - 3;
+  const innerR = outerR * 0.55; // white centre
+
+  // Colours: to-collect = coral, mine = yellow, collected = green
+  const segments: { count: number; color: string }[] = [];
+  if (cl.toCollect > 0) segments.push({ count: cl.toCollect, color: '#FF8E72' });
+  if (cl.mine > 0) segments.push({ count: cl.mine, color: '#FFE66D' });
+  if (cl.collected > 0) segments.push({ count: cl.collected, color: '#58D68D' });
+
+  // If only one type, render a simple solid circle (no pie slices needed)
+  if (segments.length === 1) {
+    const html = `<div style="
+      width:${size}px;height:${size}px;
+      background:${segments[0].color};
+      border:3px solid #fff;
+      border-radius:50%;
+      display:flex;align-items:center;justify-content:center;
+      color:#fff;font-weight:700;font-size:${fontSize}px;
+      box-shadow:0 2px 8px rgba(0,0,0,0.3);
+      filter:drop-shadow(0 2px 3px rgba(0,0,0,0.35));
+      font-family:-apple-system,BlinkMacSystemFont,sans-serif;
+      text-shadow:0 1px 2px rgba(0,0,0,0.3);
+    ">${cl.count}</div>`;
+    return L.divIcon({
+      className: 'cluster-marker-icon',
+      html,
+      iconSize: [size, size],
+      iconAnchor: [size / 2, size / 2],
+    });
+  }
+
+  // Multi-type → SVG donut
+  const fid = `cf${Math.random().toString(36).slice(2, 7)}`;
+  let svgPaths = '';
+  let angle = -Math.PI / 2; // start at top (12 o'clock)
+
+  for (const seg of segments) {
+    const sliceAngle = (seg.count / cl.count) * 2 * Math.PI;
+    const endAngle = angle + sliceAngle;
+
+    const x1 = cx + outerR * Math.cos(angle);
+    const y1 = cy + outerR * Math.sin(angle);
+    const x2 = cx + outerR * Math.cos(endAngle);
+    const y2 = cy + outerR * Math.sin(endAngle);
+
+    const largeArc = sliceAngle > Math.PI ? 1 : 0;
+
+    svgPaths += `<path d="M ${cx} ${cy} L ${x1} ${y1} A ${outerR} ${outerR} 0 ${largeArc} 1 ${x2} ${y2} Z" fill="${seg.color}"/>`;
+    angle = endAngle;
+  }
+
+  const html = `
+<svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <filter id="${fid}" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="2" stdDeviation="3" flood-color="#000" flood-opacity="0.35"/>
+    </filter>
+  </defs>
+  ${svgPaths}
+  <circle cx="${cx}" cy="${cy}" r="${outerR}" fill="none" stroke="#fff" stroke-width="3" filter="url(#${fid})"/>
+  <circle cx="${cx}" cy="${cy}" r="${innerR}" fill="#fff" opacity="0.95"/>
+  <text x="${cx}" y="${cy}" text-anchor="middle" dominant-baseline="central"
+        font-family="-apple-system,BlinkMacSystemFont,sans-serif" font-weight="700"
+        font-size="${fontSize}" fill="#2C3E50">${cl.count}</text>
+</svg>`;
 
   return L.divIcon({
     className: 'cluster-marker-icon',
@@ -257,7 +332,7 @@ export function MapPage({ onStatsChanged, userId, username, dark }: { onStatsCha
     markersRef.current = [];
 
     // Cluster
-    const { clusters, singles } = clusterFish(fishList, map);
+    const { clusters, singles } = clusterFish(fishList, map, userId, collectedFishIds);
 
     // Render single-fish markers
     for (const f of singles) {
@@ -285,7 +360,7 @@ export function MapPage({ onStatsChanged, userId, username, dark }: { onStatsCha
 
     // Render cluster markers
     for (const cl of clusters) {
-      const marker = L.marker(cl.center, { icon: makeClusterIcon(cl.count) })
+      const marker = L.marker(cl.center, { icon: makeClusterIcon(cl) })
         .addTo(map)
         .on('click', () => {
           setSelectedFish(null);
