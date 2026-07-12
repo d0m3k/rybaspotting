@@ -79,10 +79,11 @@ function clusterFish(
   return { clusters, singles };
 }
 
-/** Compute off-screen indicators — one per 45° sector, placed on the viewport edge. */
+/** Compute off-screen indicators — one per 45° sector, snapped to a fixed
+ *  position on the viewport edge so they don't jitter while panning. */
 function computeEdgeIndicators(fishList: any[], map: L.Map): EdgeIndicator[] {
   const bounds = map.getBounds();
-  const pad = 0.0005; // tiny inset so barely-in-view fish don't trigger arrows
+  const pad = 0.0005;
   const south = bounds.getSouth() + pad;
   const north = bounds.getNorth() - pad;
   const west = bounds.getWest() + pad;
@@ -94,9 +95,8 @@ function computeEdgeIndicators(fishList: any[], map: L.Map): EdgeIndicator[] {
   for (const f of fishList) {
     const lat = f.latitude;
     const lng = f.longitude;
-    if (lat >= south && lat <= north && lng >= west && lng <= east) continue; // in view
+    if (lat >= south && lat <= north && lng >= west && lng <= east) continue;
 
-    // Bearing from map center to fish (0° = north, clockwise)
     const center = bounds.getCenter();
     const dLng = lng - center.lng;
     const dLat = lat - center.lat;
@@ -108,19 +108,26 @@ function computeEdgeIndicators(fishList: any[], map: L.Map): EdgeIndicator[] {
     sectors.get(sector)!.push(f);
   }
 
+  // Snap each sector to a fixed anchor point on the viewport border.
+  // 0=N mid-top, 1=NE top-right, 2=E mid-right, 3=SE bottom-right,
+  // 4=S mid-bottom, 5=SW bottom-left, 6=W mid-left, 7=NW top-left.
+  const midLat = (south + north) / 2;
+  const midLng = (west + east) / 2;
+  const anchors: [number, number][] = [
+    [north, midLng],       // 0 N
+    [north, east],          // 1 NE
+    [midLat, east],         // 2 E
+    [south, east],          // 3 SE
+    [south, midLng],        // 4 S
+    [south, west],          // 5 SW
+    [midLat, west],         // 6 W
+    [north, west],          // 7 NW
+  ];
+
   const indicators: EdgeIndicator[] = [];
-  for (const [, group] of sectors) {
-    // Average position of fish in this sector
-    let sumLat = 0, sumLng = 0;
-    for (const f of group) { sumLat += f.latitude; sumLng += f.longitude; }
-    const avgLat = sumLat / group.length;
-    const avgLng = sumLng / group.length;
-
-    // Clamp to viewport edge → the closest point on the bounding rect
-    const clampLat = Math.max(south, Math.min(north, avgLat));
-    const clampLng = Math.max(west, Math.min(east, avgLng));
-
-    indicators.push({ latlng: [clampLat, clampLng], count: group.length });
+  for (const [sector, group] of sectors) {
+    const anchor = anchors[sector] || [midLat, midLng];
+    indicators.push({ latlng: anchor, count: group.length });
   }
 
   return indicators;
@@ -287,6 +294,7 @@ export function MapPage({ onStatsChanged, userId, username, dark }: { onStatsCha
   // Cluster detail sheet state
   const [clusterDetail, setClusterDetail] = useState<FishCluster | null>(null);
   const [clusterPage, setClusterPage] = useState(0);
+  const [hasLocation, setHasLocation] = useState(false);
 
   useEffect(() => {
     const map = L.map('map').setView([50.0647, 19.9450], 13);
@@ -320,6 +328,43 @@ export function MapPage({ onStatsChanged, userId, username, dark }: { onStatsCha
       }
     };
   }, [dark]);
+
+  // ── Geolocation + recenter button ─────────────────────────────────────
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+
+    // Start watching position — Leaflet draws the blue dot automatically
+    map.locate({ watch: true, enableHighAccuracy: true, timeout: 10000 });
+
+    const onLocationFound = () => setHasLocation(true);
+    const onLocationError = () => setHasLocation(false);
+    map.on('locationfound', onLocationFound);
+    map.on('locationerror', onLocationError);
+
+    // Custom recenter control below the zoom buttons
+    const RecenterControl = L.Control.extend({
+      onAdd: function () {
+        const btn = L.DomUtil.create('button', 'map-recenter-btn');
+        btn.innerHTML = '◎';
+        btn.title = 'Pokaż moją lokalizację';
+        L.DomEvent.on(btn, 'click', function (e: Event) {
+          L.DomEvent.stopPropagation(e);
+          map.locate({ setView: true, enableHighAccuracy: true, timeout: 8000 });
+        });
+        return btn;
+      },
+    });
+    const ctrl = new RecenterControl({ position: 'bottomright' });
+    map.addControl(ctrl);
+
+    return () => {
+      map.off('locationfound', onLocationFound);
+      map.off('locationerror', onLocationError);
+      map.removeControl(ctrl);
+    };
+  }, []);
 
   // ── Render markers with clustering ──────────────────────────────────────
 
@@ -500,7 +545,6 @@ export function MapPage({ onStatsChanged, userId, username, dark }: { onStatsCha
         <span class="map-legend-item"><span class="map-legend-dot" style="background:#FF8E72;border-color:#C0392B;"></span> do zebrania</span>
         <span class="map-legend-item"><span class="map-legend-dot" style="background:#FFE66D;border-color:#D4AC0D;"></span> Twoja</span>
         <span class="map-legend-item"><span class="map-legend-dot" style="background:#58D68D;border-color:#1E8449;"></span> zebrana</span>
-        <span class="map-legend-item"><span class="map-legend-dot" style="background:linear-gradient(135deg,#FF6B6B,#FF8E72);border-color:#fff;border-radius:50%;"></span> grupa</span>
       </div>
 
       {/* ── Cluster detail bottom sheet ─────────────────────────────── */}

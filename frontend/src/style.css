@@ -537,6 +537,39 @@ html.dark .leaflet-control-attribution a {
   color: var(--text-secondary);
 }
 
+/* Recenter (my location) button — matches Leaflet zoom control style */
+.map-recenter-btn {
+  width: 30px;
+  height: 30px;
+  border: 2px solid rgba(0,0,0,0.2);
+  border-radius: 4px;
+  background: #fff;
+  cursor: pointer;
+  font-size: 18px;
+  line-height: 26px;
+  text-align: center;
+  padding: 0;
+  color: #333;
+  display: block;
+  margin-top: -1px; /* snug against zoom-out */
+}
+.map-recenter-btn:hover {
+  background: #f4f4f4;
+}
+html.dark .map-recenter-btn {
+  background-color: var(--bg-card);
+  color: var(--text);
+  border-color: var(--border);
+}
+html.dark .map-recenter-btn:hover {
+  background-color: var(--bg-highlight);
+}
+
+/* Make Leaflet's own location marker use our teal */
+.leaflet-control-locate a {
+  font-size: 18px;
+}
+
 /* === Bottom Sheet === */
 .bottom-sheet {
   position: absolute;
