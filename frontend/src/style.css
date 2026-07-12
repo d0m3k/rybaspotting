@@ -1357,6 +1357,95 @@ h3 {
   filter: drop-shadow(0 2px 3px rgba(0,0,0,0.45));
 }
 
+/* === Cluster marker icon === */
+.cluster-marker-icon {
+  background: none !important;
+  border: none !important;
+}
+
+/* === Edge arrow indicator === */
+.edge-arrow-icon {
+  background: none !important;
+  border: none !important;
+  filter: drop-shadow(0 1px 3px rgba(0,0,0,0.3));
+  opacity: 0.85;
+  transition: opacity 0.2s;
+}
+
+/* === Cluster detail bottom sheet === */
+.cluster-fish-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+
+.cluster-fish-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  background: var(--bg-input);
+  border-radius: 12px;
+  cursor: pointer;
+  transition: all 0.2s;
+  border: 1px solid var(--border);
+}
+
+.cluster-fish-item:hover,
+.cluster-fish-item:active {
+  background: var(--bg-highlight);
+  border-color: #FFB3A7;
+  transform: translateX(3px);
+}
+
+.cluster-fish-thumb {
+  width: 48px;
+  height: 48px;
+  object-fit: cover;
+  border-radius: 8px;
+  flex-shrink: 0;
+}
+
+.cluster-fish-info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+
+.cluster-fish-spotter {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.cluster-fish-date {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.cluster-fish-addr {
+  font-size: 11px;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.cluster-fish-arrow {
+  font-size: 22px;
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+
+.cluster-pagination {
+  display: flex;
+  gap: 8px;
+  margin-top: 4px;
+}
+
 /* === PWA Install banner === */
 .install-banner {
   position: fixed;
