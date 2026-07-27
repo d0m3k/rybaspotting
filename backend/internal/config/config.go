@@ -27,6 +27,15 @@ type Config struct {
 	// to prevent a single bot account from running up R2 storage/Class-A bills.
 	MaxFishPerDay int
 
+	// MaxCommentsPerDay caps how many comments a single user can post per rolling
+	// 24h. Default 1000 — generous for real human use, hard ceiling on spam.
+	MaxCommentsPerDay int
+
+	// MaxCommentLength caps the number of runes (Unicode code points) in a comment
+	// body. Default 2000 — long enough for a paragraph, short enough to keep the
+	// wall readable and the DB rows small.
+	MaxCommentLength int
+
 	// R2 / S3-compatible storage (optional — falls back to local disk if empty)
 	R2Endpoint       string
 	R2AccessKeyID    string
@@ -56,6 +65,12 @@ func Load() *Config {
 
 		// Default 300 fish/user/day — generous for real use, hard cap on abuse.
 		MaxFishPerDay: getEnvInt("MAX_FISH_PER_DAY", 300),
+
+		// Default 1000 comments/user/day — generous for real use, hard cap on spam.
+		MaxCommentsPerDay: getEnvInt("MAX_COMMENTS_PER_DAY", 1000),
+
+		// Default 2000 runes/comment — paragraph-length, keeps the wall readable.
+		MaxCommentLength: getEnvInt("MAX_COMMENT_LENGTH", 2000),
 
 		// R2 / S3-compatible storage (all empty = use local disk)
 		R2Endpoint:        getEnv("R2_ENDPOINT", ""),

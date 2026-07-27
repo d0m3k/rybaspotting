@@ -7,13 +7,14 @@ import { MapPage } from './pages/Map';
 import { SpotPage } from './pages/Spot';
 import { UploadPage } from './pages/Upload';
 import { LeaderboardPage } from './pages/Leaderboard';
+import { WallPage } from './pages/Wall';
 import { ProfilePage } from './pages/Profile';
 import { AdminStatsPage } from './pages/AdminStats';
 import { PrivacyPolicyPage } from './pages/PrivacyPolicy';
 import { NavBar } from './components/NavBar';
 import { PrivacyBanner } from './components/PrivacyBanner';
 
-type Page = 'login' | 'register' | 'map' | 'spot' | 'upload' | 'leaderboard' | 'profile' | 'admin' | 'privacy';
+type Page = 'login' | 'register' | 'map' | 'spot' | 'upload' | 'leaderboard' | 'wall' | 'profile' | 'admin' | 'privacy';
 
 interface UserStats {
   spotted: number;
@@ -150,6 +151,7 @@ export function App() {
         {page === 'spot' && <SpotPage onHideNav={setHideNav} onStatsChanged={refreshStats} />}
         {page === 'upload' && allowUpload && <UploadPage onStatsChanged={refreshStats} />}
         {page === 'leaderboard' && <LeaderboardPage />}
+        {page === 'wall' && <WallPage onGoToMap={() => navigate('map')} myUserId={auth.userId} isAdmin={auth.isAdmin} />}
         {page === 'profile' && <ProfilePage auth={auth} onLogout={handleLogout} onOpenPrivacy={() => setPage('privacy')} />}
         {page === 'admin' && <AdminStatsPage />}
         {page === 'privacy' && <PrivacyPolicyPage onBack={() => setPage(auth ? 'map' : 'login')} />}

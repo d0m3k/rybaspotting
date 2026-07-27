@@ -5,6 +5,7 @@ import { api } from '../api';
 import { distanceMeters } from '../distance';
 import { loadAuth } from '../stores/auth';
 import { mapTiles } from '../mapStyle';
+import { takeFocusFish } from '../focus';
 
 // Fix Leaflet default icon issue
 delete (L.Icon.Default.prototype as any)._getIconUrl;
@@ -292,6 +293,12 @@ export function MapPage({ onStatsChanged, userId, username, dark }: { onStatsCha
   const [detailLoading, setDetailLoading] = useState(false);
   const [collectedFishIds, setCollectedFishIds] = useState<Set<number>>(new Set());
 
+  // Comments
+  const [comments, setComments] = useState<any[]>([]);
+  const [commentsLoading, setCommentsLoading] = useState(false);
+  const [commentText, setCommentText] = useState('');
+  const [commentSending, setCommentSending] = useState(false);
+
   // Cluster detail sheet state
   const [clusterDetail, setClusterDetail] = useState<FishCluster | null>(null);
   const [clusterPage, setClusterPage] = useState(0);
@@ -437,6 +444,7 @@ export function MapPage({ onStatsChanged, userId, username, dark }: { onStatsCha
           setClusterDetail(null);
           setSelectedFish(f);
           setFishDetail(null);
+          setComments([]);
           setDetailLoading(true);
           try {
             const detail = await api.getFish(f.id);
@@ -447,6 +455,11 @@ export function MapPage({ onStatsChanged, userId, username, dark }: { onStatsCha
           } finally {
             setDetailLoading(false);
           }
+          setCommentsLoading(true);
+          api.listComments(f.id)
+            .then(list => setComments(list || []))
+            .catch(() => setComments([]))
+            .finally(() => setCommentsLoading(false));
         });
       markersRef.current.push(marker);
     }
@@ -576,11 +589,70 @@ export function MapPage({ onStatsChanged, userId, username, dark }: { onStatsCha
     setClusterDetail(null);
     setSelectedFish(f);
     setFishDetail(null);
+    setComments([]);
     setDetailLoading(true);
     api.getFish(f.id)
       .then(d => setFishDetail(d))
       .catch(() => setFishDetail(null))
       .finally(() => setDetailLoading(false));
+    setCommentsLoading(true);
+    api.listComments(f.id)
+      .then(list => setComments(list || []))
+      .catch(() => setComments([]))
+      .finally(() => setCommentsLoading(false));
+  }
+
+  // ── Pending focus from the Wall (fly to a fish on mount) ───────────────
+  useEffect(() => {
+    const id = takeFocusFish();
+    if (!id) return;
+    const map = mapRef.current;
+    if (!map) return;
+    setSelectedFish(null);
+    setFishDetail(null);
+    setComments([]);
+    setDetailLoading(true);
+    api.getFish(id)
+      .then((f: any) => {
+        if (f && f.latitude != null && f.longitude != null) {
+          map.setView([f.latitude, f.longitude], Math.max(map.getZoom(), 18), { animate: true });
+          setSelectedFish(f);
+          setFishDetail(f);
+        }
+      })
+      .catch(() => {})
+      .finally(() => setDetailLoading(false));
+    setCommentsLoading(true);
+    api.listComments(id)
+      .then(list => setComments(list || []))
+      .catch(() => setComments([]))
+      .finally(() => setCommentsLoading(false));
+  }, []);
+
+  // ── Comment actions ───────────────────────────────────────────────────
+  async function handleCommentSubmit(fishId: number) {
+    const text = commentText.trim();
+    if (!text) return;
+    setCommentSending(true);
+    try {
+      const c = await api.addComment(fishId, text);
+      setComments(prev => [...(prev || []), c]);
+      setCommentText('');
+    } catch (err: any) {
+      alert(err.message || 'Nie udało się dodać komentarza');
+    } finally {
+      setCommentSending(false);
+    }
+  }
+
+  async function handleDeleteComment(commentId: number) {
+    if (!window.confirm('Usunąć komentarz?')) return;
+    try {
+      await api.deleteComment(commentId);
+      setComments(prev => prev.filter(c => c.id !== commentId));
+    } catch (err: any) {
+      alert(err.message || 'Nie udało się usunąć komentarza');
+    }
   }
 
   return (
@@ -722,6 +794,54 @@ export function MapPage({ onStatsChanged, userId, username, dark }: { onStatsCha
           {hasCollected && (
             <p class="fish-note">✅ Już zebrałeś tę rybę</p>
           )}
+
+          {/* ── Comments ───────────────────────────────────────────── */}
+          <div class="fish-comments">
+            <h4 class="fish-comments-title">💬 Komentarze {comments.length > 0 && <span class="count">({comments.length})</span>}</h4>
+
+            <div class="fish-comments-list">
+              {commentsLoading && <p class="muted">Ładowanie…</p>}
+              {!commentsLoading && comments.length === 0 && <p class="muted">Brak komentarzy — bądź pierwszy!</p>}
+              {comments.map((c) => {
+                const mine = (loadAuth()?.userId) === c.user_id;
+                const canDel = mine || (loadAuth()?.isAdmin ?? false);
+                return (
+                  <div class="fish-comment" key={c.id}>
+                    <div class="fish-comment-head">
+                      <span class="fish-comment-author">{c.username}</span>
+                      <span class="fish-comment-time">
+                        {new Date(c.created_at).toLocaleDateString('pl-PL', { day: 'numeric', month: 'short', year: 'numeric' })}
+                      </span>
+                      {canDel && (
+                        <button class="fish-comment-del" title="Usuń" onClick={() => handleDeleteComment(c.id)}>🗑</button>
+                      )}
+                    </div>
+                    <p class="fish-comment-body">{c.body}</p>
+                  </div>
+                );
+              })}
+            </div>
+
+            <div class="fish-comment-form">
+              <textarea
+                class="input fish-comment-input"
+                placeholder="Napisz komentarz… (max 2000 znaków)"
+                maxLength={2000}
+                rows={2}
+                value={commentText}
+                onInput={(e: any) => setCommentText(e.target.value)}
+              />
+              <button
+                class="btn btn-primary"
+                style={{ marginTop: 0, padding: '10px', fontSize: '14px' }}
+                disabled={commentSending || !commentText.trim()}
+                onClick={() => handleCommentSubmit(selectedFish.id)}
+              >
+                {commentSending ? 'Wysyłanie…' : 'Dodaj komentarz'}
+              </button>
+            </div>
+          </div>
+
           {canCollect && (
             <button
               class="btn btn-primary"

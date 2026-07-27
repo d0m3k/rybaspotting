@@ -78,6 +78,22 @@ export const api = {
   uncollect: (fishId: number) =>
     request(`/api/fish/${fishId}/collect`, { method: 'DELETE' }),
 
+  // Comments
+  listComments: (fishId: number) =>
+    request<any[]>(`/api/fish/${fishId}/comments`),
+
+  addComment: (fishId: number, body: string) =>
+    request<any>(`/api/fish/${fishId}/comments`, {
+      method: 'POST',
+      body: JSON.stringify({ body }),
+    }),
+
+  deleteComment: (commentId: number) =>
+    request(`/api/comments/${commentId}`, { method: 'DELETE' }),
+
+  recentComments: (limit = 50) =>
+    request<any[]>(`/api/comments/recent?limit=${limit}`),
+
   // User stats
   getMyStats: () =>
     request<{

@@ -1,6 +1,6 @@
 import { h } from 'preact';
 
-type Page = 'login' | 'register' | 'map' | 'spot' | 'upload' | 'leaderboard' | 'profile' | 'admin';
+type Page = 'login' | 'register' | 'map' | 'spot' | 'upload' | 'leaderboard' | 'wall' | 'profile' | 'admin';
 
 interface NavBarProps {
   current: Page;
@@ -15,9 +15,10 @@ export function NavBar({ current, onNavigate, allowUpload, isAdmin }: NavBarProp
     { page: 'map', label: 'Mapa', icon: '🗺️' },
   ];
 
-  // Right-side tabs — Ranking always present, plus extras
+  // Right-side tabs — Ranking + Wall always present, plus extras
   const rightTabs: { page: Page; label: string; icon: string }[] = [
     { page: 'leaderboard', label: 'Ranking', icon: '🏆' },
+    { page: 'wall', label: 'Wall', icon: '💬' },
   ];
   if (allowUpload) {
     rightTabs.push({ page: 'upload', label: 'Wgraj', icon: '📂' });

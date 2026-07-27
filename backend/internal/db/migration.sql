@@ -37,3 +37,19 @@ CREATE INDEX IF NOT EXISTS idx_collections_user ON collections (user_id);
 
 -- Soft-delete support for users (admin action)
 ALTER TABLE users ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ;
+
+-- Comments on fish spots.
+-- body is stored as plain text (control chars stripped server-side); the
+-- frontend must render it as text (JSX interpolation), never innerHTML, so
+-- stored XSS is not possible.
+CREATE TABLE IF NOT EXISTS comments (
+    id          SERIAL PRIMARY KEY,
+    fish_id     INTEGER NOT NULL REFERENCES fish(id) ON DELETE CASCADE,
+    user_id     INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    body        TEXT NOT NULL,
+    created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_comments_fish   ON comments (fish_id, created_at);
+CREATE INDEX IF NOT EXISTS idx_comments_recent ON comments (created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_comments_user   ON comments (user_id, created_at DESC);

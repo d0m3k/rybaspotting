@@ -71,6 +71,7 @@ func main() {
 	collectH := &handlers.CollectHandler{DB: conn}
 	leaderboardH := &handlers.LeaderboardHandler{DB: conn}
 	userH := &handlers.UserHandler{DB: conn, Cfg: cfg, Storage: stor}
+	commentH := &handlers.CommentHandler{DB: conn, Cfg: cfg}
 
 	// Build router
 	r := chi.NewRouter()
@@ -99,6 +100,10 @@ func main() {
 		r.Get("/fish/{id}", fishH.Get)
 		r.Get("/fish/nearby", fishH.Nearby)
 
+		// Comments - read endpoints are public
+		r.Get("/fish/{id}/comments", commentH.List)
+		r.Get("/comments/recent", commentH.Recent)
+
 		// Photo serving
 		r.Get("/photos/{filename}", fishH.ServePhoto)
 
@@ -113,6 +118,10 @@ func main() {
 			r.Delete("/fish/{id}", fishH.DeleteMyFish)
 			r.Post("/fish/{id}/collect", collectH.Collect)
 			r.Delete("/fish/{id}/collect", collectH.Uncollect)
+
+			// Comments - create + delete (auth required)
+			r.Post("/fish/{id}/comments", commentH.Create)
+			r.Delete("/comments/{id}", commentH.Delete)
 
 			// User stats
 			r.Get("/users/me", userH.Me)
