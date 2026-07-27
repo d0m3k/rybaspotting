@@ -3,7 +3,7 @@ import { api } from '../api';
 import { Avatar } from '../components/Avatar';
 
 export function LeaderboardPage() {
-  const [data, setData] = useState<{ top_spotters: any[]; top_collectors: any[] } | null>(null);
+  const [data, setData] = useState<{ top_spotters: any[]; top_collectors: any[]; top_commenters: any[] } | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -18,6 +18,7 @@ export function LeaderboardPage() {
 
   const spotters = data.top_spotters || [];
   const collectors = data.top_collectors || [];
+  const commenters = data.top_commenters || [];
 
   function medal(i: number): string {
     if (i === 0) return '🥇';
@@ -73,6 +74,31 @@ export function LeaderboardPage() {
             ))}
             {collectors.length === 0 && (
               <tr><td colSpan={3} style="text-align:center;color:var(--text-muted);padding:16px;">Brak danych</td></tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+
+      <div class="leaderboard-section">
+        <h3>💬 Top Commenters — kto najwięcej komentuje</h3>
+        <p class="leaderboard-sub">Komentarze pomagają innym — np. „ta rybka z wczoraj pożyje jeszcze parę dni”.</p>
+        <table class="leaderboard-table">
+          <thead>
+            <tr><th>#</th><th>Użytkownik</th><th>💬</th></tr>
+          </thead>
+          <tbody>
+            {commenters.map((e, i) => (
+              <tr key={e.username}>
+                <td><span class="rank-medal">{medal(i)}</span> {i + 1}</td>
+                <td style="display:flex;align-items:center;gap:8px;">
+                  <Avatar userId={e.user_id} name={e.username} size={26} />
+                  <strong>{e.username}</strong>
+                </td>
+                <td>{e.count}</td>
+              </tr>
+            ))}
+            {commenters.length === 0 && (
+              <tr><td colSpan={3} style="text-align:center;color:var(--text-muted);padding:16px;">Brak komentarzy — bądź pierwszy!</td></tr>
             )}
           </tbody>
         </table>

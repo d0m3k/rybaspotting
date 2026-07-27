@@ -788,6 +788,9 @@ export function MapPage({ onStatsChanged, userId, username, dark }: { onStatsCha
               '🎣 Brak zbieraczy'
             )}
           </p>
+          {comments.length > 0 && (
+            <p class="fish-comments-teaser">💬 {comments.length} komentarz{comments.length === 1 ? '' : (comments.length >= 2 && comments.length <= 4 ? 'y' : 'ów')} — zobacz niżej ⬇</p>
+          )}
           {isOwnFish && (
             <p class="fish-note">📸 To Twoja ryba — jesteś jej spotterem!</p>
           )}

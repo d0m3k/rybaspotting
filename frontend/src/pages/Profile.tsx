@@ -9,6 +9,7 @@ interface UserStats {
   is_admin: boolean;
   spotted: number;
   collected: number;
+  comments: number;
   has_avatar: boolean;
 }
 
@@ -212,6 +213,11 @@ export function ProfilePage({ auth, onLogout, onOpenPrivacy }: Props) {
               <div class="stats-fish-icon">🎣</div>
               <div class="stat-count collected">{stats.collected}</div>
               <div class="stat-label">Zebrane</div>
+            </div>
+            <div class="profile-stat">
+              <div class="stats-fish-icon">💬</div>
+              <div class="stat-count collected">{stats.comments}</div>
+              <div class="stat-label">Komentarze</div>
             </div>
           </div>
         )}

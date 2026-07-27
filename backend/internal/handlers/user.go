@@ -31,6 +31,7 @@ type userStatsResponse struct {
 	IsAdmin     bool   `json:"is_admin"`
 	Spotted     int    `json:"spotted"`
 	Collected   int    `json:"collected"`
+	Comments   int    `json:"comments"`
 	HasAvatar   bool   `json:"has_avatar"`
 }
 
@@ -71,6 +72,11 @@ func (h *UserHandler) Me(w http.ResponseWriter, r *http.Request) {
 	h.DB.QueryRow(
 		`SELECT COUNT(*) FROM collections WHERE user_id = $1`, userID,
 	).Scan(&resp.Collected)
+
+	// Count comments posted
+	h.DB.QueryRow(
+		`SELECT COUNT(*) FROM comments WHERE user_id = $1`, userID,
+	).Scan(&resp.Comments)
 
 	// Check avatar via storage
 	resp.HasAvatar = h.Storage.Exists(storage.AvatarKey(userID))

@@ -103,6 +103,7 @@ export const api = {
       is_admin: boolean;
       spotted: number;
       collected: number;
+      comments: number;
       has_avatar: boolean;
     }>('/api/users/me'),
 
@@ -201,7 +202,7 @@ export const api = {
 
   // Leaderboard
   leaderboard: () =>
-    request<{ top_spotters: { username: string; count: number }[]; top_collectors: { username: string; count: number }[] }>(
+    request<{ top_spotters: { user_id: number; username: string; count: number }[]; top_collectors: { user_id: number; username: string; count: number }[]; top_commenters: { user_id: number; username: string; count: number }[] }>(
       '/api/leaderboard'
     ),
 };

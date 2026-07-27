@@ -26,6 +26,7 @@ type LeaderboardEntry struct {
 }
 
 type Leaderboard struct {
-	TopSpotters   []LeaderboardEntry `json:"top_spotters"`
-	TopCollectors []LeaderboardEntry `json:"top_collectors"`
+	TopSpotters    []LeaderboardEntry `json:"top_spotters"`
+	TopCollectors  []LeaderboardEntry `json:"top_collectors"`
+	TopCommenters  []LeaderboardEntry `json:"top_commenters"`
 }

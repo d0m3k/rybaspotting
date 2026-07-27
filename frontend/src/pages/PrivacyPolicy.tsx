@@ -44,6 +44,9 @@ export function PrivacyPolicyPage({ onBack }: Props) {
             <strong>Kolekcje</strong> — informacja o tym, które ryby zebrałeś/aś.
           </li>
           <li>
+            <strong>Komentarze</strong> — treść komentarzy które dodajesz do rybek, wraz z powiązaniem z Twoim kontem i datą. Komentarze są publiczne (widoczne na rybce oraz na zbiorczym „Wallu” komentarzy) i przechowywane jako zwykły tekst — nie obsługujemy formatowania ani HTML, aby zapobiec atakom XSS.
+          </li>
+          <li>
             <strong>Zdjęcie profilowe (awatar)</strong> — jeśli zdecydujesz się
             je przesłać.
           </li>
@@ -187,7 +190,26 @@ export function PrivacyPolicyPage({ onBack }: Props) {
       </section>
 
       <section class="privacy-section">
-        <h3>9. Kontakt</h3>
+        <h3>9. Co to za aplikacja — i jak działa „Wall”</h3>
+        <p>
+          <strong>Ryby z Dupom</strong> to społecznościowa gra polegająca na
+          znajdowaniu i „zbieraniu” graffiti ryb w Krakowie. Oprócz września
+          rybek możesz zostawiać do nich <strong>komentarze</strong> — na
+          przykład: „ta rybka z wczoraj pożyje jeszcze maks kilka dni”. Wszystkie
+          ostatnie komentarze zbierają się na wspólnym <strong>Wallu</strong>
+          (zakładka 💬 w menu). Kliknięcie komentarza na Wallu przenosi Cię
+          na mapę prosto do tej rybki.
+        </p>
+        <p>
+          Komentarze są ograniczone do 2000 znaków i 1000 komentarzy na użytkownika
+          dziennie (aby zapobiec spamowi), a ich treść jest sanitizowana do
+          zwykłego tekstu przed zapisaniem w bazie — dzięki temu złośliwy kod
+          (XSS) nie może się wykonać w przeglądarce.
+        </p>
+      </section>
+
+      <section class="privacy-section">
+        <h3>10. Kontakt</h3>
         <p>
           W sprawach dotyczących prywatności i danych osobowych prosimy o
           kontakt:{' '}

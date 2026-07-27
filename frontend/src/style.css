@@ -2092,3 +2092,16 @@ h3 {
   padding: 4px 8px;
 }
 .wall-del-btn:hover { opacity: 1; }
+
+/* Inline teaser hinting at comments below the details pane */
+.fish-comments-teaser {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin: 4px 0 6px;
+  font-weight: 500;
+}
+.leaderboard-sub {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin: -4px 0 8px;
+}

@@ -15,6 +15,7 @@ func (h *LeaderboardHandler) Get(w http.ResponseWriter, r *http.Request) {
 	lb := models.Leaderboard{
 		TopSpotters:   make([]models.LeaderboardEntry, 0),
 		TopCollectors: make([]models.LeaderboardEntry, 0),
+		TopCommenters: make([]models.LeaderboardEntry, 0),
 	}
 
 	// Top spotters
@@ -51,6 +52,25 @@ func (h *LeaderboardHandler) Get(w http.ResponseWriter, r *http.Request) {
 			var e models.LeaderboardEntry
 			if err := rows2.Scan(&e.UserID, &e.Username, &e.Count); err == nil {
 				lb.TopCollectors = append(lb.TopCollectors, e)
+			}
+		}
+	}
+
+	// Top commenters
+	rows3, err := h.DB.Query(
+		`SELECT u.id, u.username, COUNT(cm.id) AS count
+		 FROM users u
+		 JOIN comments cm ON cm.user_id = u.id
+		 GROUP BY u.id, u.username
+		 ORDER BY count DESC
+		 LIMIT 50`,
+	)
+	if err == nil {
+		defer rows3.Close()
+		for rows3.Next() {
+			var e models.LeaderboardEntry
+			if err := rows3.Scan(&e.UserID, &e.Username, &e.Count); err == nil {
+				lb.TopCommenters = append(lb.TopCommenters, e)
 			}
 		}
 	}

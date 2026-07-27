@@ -19,6 +19,7 @@ type Page = 'login' | 'register' | 'map' | 'spot' | 'upload' | 'leaderboard' | '
 interface UserStats {
   spotted: number;
   collected: number;
+  comments: number;
   display_name: string;
   has_avatar: boolean;
   user_id: number;
@@ -46,7 +47,7 @@ export function App() {
 
   const refreshStats = useCallback(() => {
     api.getMyStats()
-      .then(s => setStats({ spotted: s.spotted, collected: s.collected, display_name: s.display_name, has_avatar: s.has_avatar, user_id: s.user_id }))
+      .then(s => setStats({ spotted: s.spotted, collected: s.collected, comments: s.comments, display_name: s.display_name, has_avatar: s.has_avatar, user_id: s.user_id }))
       .catch(() => {});
   }, []);
 
