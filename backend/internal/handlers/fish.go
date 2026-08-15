@@ -16,6 +16,7 @@ import (
 	"rybaspotting/internal/config"
 	"rybaspotting/internal/middleware"
 	"rybaspotting/internal/models"
+	"rybaspotting/internal/notify"
 	"rybaspotting/internal/storage"
 
 	"github.com/disintegration/imaging"
@@ -26,6 +27,7 @@ type FishHandler struct {
 	DB      *sql.DB
 	Cfg     *config.Config
 	Storage storage.Storage
+	Notify  *notify.Notifier
 }
 
 func (h *FishHandler) Create(w http.ResponseWriter, r *http.Request) {
@@ -160,6 +162,16 @@ func (h *FishHandler) Create(w http.ResponseWriter, r *http.Request) {
 	}
 
 	ok = true // everything succeeded
+
+	// Push notification for the key event: a new fish was spotted.
+	if h.Notify != nil {
+		var spotterName string
+		h.DB.QueryRow(`SELECT COALESCE(NULLIF(display_name, ''), username) FROM users WHERE id = $1`, userID).Scan(&spotterName)
+		if spotterName == "" {
+			spotterName = fmt.Sprintf("user #%d", userID)
+		}
+		h.Notify.FishSpotted(spotterName, addressHint, fishID, lat, lng)
+	}
 
 	// Return created fish
 	f := models.Fish{

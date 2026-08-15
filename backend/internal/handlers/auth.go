@@ -9,13 +9,15 @@ import (
 
 	"rybaspotting/internal/config"
 	"rybaspotting/internal/middleware"
+	"rybaspotting/internal/notify"
 
 	"golang.org/x/crypto/bcrypt"
 )
 
 type AuthHandler struct {
-	DB  *sql.DB
-	Cfg *config.Config
+	DB     *sql.DB
+	Cfg    *config.Config
+	Notify *notify.Notifier
 }
 
 type registerRequest struct {
@@ -101,6 +103,11 @@ func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 	}
 
 	log.Printf("[AUTH] type=register user=%s ip=%s id=%d", req.Username, r.RemoteAddr, userID)
+
+	// Push notification for the key event: a new account was created.
+	if h.Notify != nil {
+		h.Notify.UserRegistered(req.Username)
+	}
 
 	writeJSON(w, http.StatusCreated, map[string]string{
 		"message": "registration successful",

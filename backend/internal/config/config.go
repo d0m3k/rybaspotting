@@ -43,6 +43,16 @@ type Config struct {
 	R2Bucket         string
 	R2PublicURL      string
 
+	// Pushover notifications (optional — disabled unless BOTH keys are set).
+	// UserKey is your personal key from pushover.net; AppToken comes from an
+	// application you create at pushover.net → Your Applications.
+	PushoverUserKey  string
+	PushoverAppToken string
+
+	// PublicURL is the app's public origin, used as the tap-through link in
+	// push notifications (e.g. https://ryby.dom3k.pl).
+	PublicURL string
+
 	mu                   sync.RWMutex
 	allowGalleryUpload   bool
 }
@@ -78,6 +88,13 @@ func Load() *Config {
 		R2SecretAccessKey: getEnv("R2_SECRET_ACCESS_KEY", ""),
 		R2Bucket:          getEnv("R2_BUCKET", ""),
 		R2PublicURL:       getEnv("R2_PUBLIC_URL", ""),
+
+		// Pushover — opt-in: notifications only when both keys are configured.
+		PushoverUserKey:  getEnv("PUSHOVER_USER_KEY", ""),
+		PushoverAppToken: getEnv("PUSHOVER_APP_TOKEN", ""),
+
+		// Public origin used inside notification links.
+		PublicURL: getEnv("PUBLIC_URL", "https://ryby.dom3k.pl"),
 	}
 	return cfg
 }

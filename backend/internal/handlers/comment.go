@@ -13,6 +13,7 @@ import (
 	"rybaspotting/internal/config"
 	"rybaspotting/internal/middleware"
 	"rybaspotting/internal/models"
+	"rybaspotting/internal/notify"
 
 	"github.com/go-chi/chi/v5"
 )
@@ -20,8 +21,9 @@ import (
 // CommentHandler handles fish comments: create, list per fish, recent wall,
 // and delete (own comment or admin).
 type CommentHandler struct {
-	DB  *sql.DB
-	Cfg *config.Config
+	DB     *sql.DB
+	Cfg    *config.Config
+	Notify *notify.Notifier
 }
 
 type createCommentRequest struct {
@@ -117,6 +119,11 @@ func (h *CommentHandler) Create(w http.ResponseWriter, r *http.Request) {
 
 	log.Printf("[COMMENT] type=created comment_id=%d user_id=%d fish_id=%d len=%d",
 		c.ID, userID, fishID, utf8.RuneCountInString(c.Body))
+
+	// Push notification for the key event: a new comment was posted.
+	if h.Notify != nil {
+		h.Notify.CommentAdded(c.Username, fishID, c.Body)
+	}
 
 	writeJSON(w, http.StatusCreated, c)
 }

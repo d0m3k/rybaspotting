@@ -2,17 +2,20 @@ package handlers
 
 import (
 	"database/sql"
+	"fmt"
 	"log"
 	"net/http"
 	"strconv"
 
 	"rybaspotting/internal/middleware"
+	"rybaspotting/internal/notify"
 
 	"github.com/go-chi/chi/v5"
 )
 
 type CollectHandler struct {
-	DB *sql.DB
+	DB     *sql.DB
+	Notify *notify.Notifier
 }
 
 func (h *CollectHandler) Collect(w http.ResponseWriter, r *http.Request) {
@@ -61,6 +64,17 @@ func (h *CollectHandler) Collect(w http.ResponseWriter, r *http.Request) {
 	h.DB.QueryRow(`SELECT u.username FROM fish f JOIN users u ON u.id = f.spotted_by WHERE f.id = $1`, fishID).Scan(&spotterName)
 
 	log.Printf("[FISH] type=collected fish_id=%d user_id=%d spotter=%s", fishID, userID, spotterName)
+
+	// Push notification for the key event: a fish was collected.
+	if h.Notify != nil {
+		var collectorName, fishAddress string
+		h.DB.QueryRow(`SELECT COALESCE(NULLIF(display_name, ''), username) FROM users WHERE id = $1`, userID).Scan(&collectorName)
+		h.DB.QueryRow(`SELECT COALESCE(address_hint, '') FROM fish WHERE id = $1`, fishID).Scan(&fishAddress)
+		if collectorName == "" {
+			collectorName = fmt.Sprintf("user #%d", userID)
+		}
+		h.Notify.FishCollected(collectorName, fishID, fishAddress)
+	}
 
 	writeJSON(w, http.StatusOK, map[string]string{"message": "collected"})
 }

@@ -18,6 +18,7 @@ import (
 	"rybaspotting/internal/db"
 	"rybaspotting/internal/handlers"
 	"rybaspotting/internal/middleware"
+	"rybaspotting/internal/notify"
 	"rybaspotting/internal/storage"
 
 	"github.com/go-chi/chi/v5"
@@ -64,14 +65,26 @@ func main() {
 		}
 	}
 
+	// Initialize push notifications (Pushover). No-op when not configured.
+	notifier := notify.New(cfg.PushoverUserKey, cfg.PushoverAppToken, cfg.PublicURL)
+	if notifier.Enabled() {
+		key := cfg.PushoverUserKey
+		if len(key) > 4 {
+			key = key[:4]
+		}
+		log.Printf("notify: Pushover notifications ENABLED (user=%s..., app=****)", key)
+	} else {
+		log.Println("notify: Pushover not configured — notifications disabled")
+	}
+
 	// Initialize handlers
-	authH := &handlers.AuthHandler{DB: conn, Cfg: cfg}
+	authH := &handlers.AuthHandler{DB: conn, Cfg: cfg, Notify: notifier}
 	adminH := &handlers.AdminHandler{DB: conn, Cfg: cfg, Storage: stor}
-	fishH := &handlers.FishHandler{DB: conn, Cfg: cfg, Storage: stor}
-	collectH := &handlers.CollectHandler{DB: conn}
+	fishH := &handlers.FishHandler{DB: conn, Cfg: cfg, Storage: stor, Notify: notifier}
+	collectH := &handlers.CollectHandler{DB: conn, Notify: notifier}
 	leaderboardH := &handlers.LeaderboardHandler{DB: conn}
 	userH := &handlers.UserHandler{DB: conn, Cfg: cfg, Storage: stor}
-	commentH := &handlers.CommentHandler{DB: conn, Cfg: cfg}
+	commentH := &handlers.CommentHandler{DB: conn, Cfg: cfg, Notify: notifier}
 
 	// Build router
 	r := chi.NewRouter()
