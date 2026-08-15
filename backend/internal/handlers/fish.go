@@ -46,6 +46,12 @@ func (h *FishHandler) Create(w http.ResponseWriter, r *http.Request) {
 		// Fail closed? No — a DB hiccup shouldn't lock out real users. Log and proceed.
 	} else if todayCount >= h.Cfg.MaxFishPerDay {
 		log.Printf("[FISH] daily-quota hit user_id=%d count=%d limit=%d", userID, todayCount, h.Cfg.MaxFishPerDay)
+		// Admin alert: hitting the upload cap is a bot/spam signal.
+		if h.Notify != nil {
+			var uname string
+			h.DB.QueryRow(`SELECT COALESCE(NULLIF(display_name, ''), username) FROM users WHERE id = $1`, userID).Scan(&uname)
+			h.Notify.QuotaHit("dodawania ryb", uname, todayCount, h.Cfg.MaxFishPerDay)
+		}
 		w.Header().Set("Retry-After", "3600")
 		http.Error(w, `{"error":"daily fish limit reached — try again tomorrow"}`, http.StatusTooManyRequests)
 		return

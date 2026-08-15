@@ -107,6 +107,8 @@ func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 	// Push notification for the key event: a new account was created.
 	if h.Notify != nil {
 		h.Notify.UserRegistered(req.Username)
+		// Admin alert: signup-spam wave detection (burst detector has a cooldown).
+		h.Notify.RegistrationBurst()
 	}
 
 	writeJSON(w, http.StatusCreated, map[string]string{
@@ -130,6 +132,9 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 		req.Username,
 	).Scan(&userID, &username, &displayName, &passwordHash, &isAdmin)
 	if err == sql.ErrNoRows {
+		if h.Notify != nil {
+			h.Notify.FailedLogin(req.Username)
+		}
 		http.Error(w, `{"error":"invalid credentials"}`, http.StatusUnauthorized)
 		return
 	}
@@ -139,6 +144,9 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := bcrypt.CompareHashAndPassword([]byte(passwordHash), []byte(req.Password)); err != nil {
+		if h.Notify != nil {
+			h.Notify.FailedLogin(req.Username)
+		}
 		http.Error(w, `{"error":"invalid credentials"}`, http.StatusUnauthorized)
 		return
 	}

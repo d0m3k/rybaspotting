@@ -89,6 +89,12 @@ func (h *CommentHandler) Create(w http.ResponseWriter, r *http.Request) {
 		} else if todayCount >= h.Cfg.MaxCommentsPerDay {
 			log.Printf("[COMMENT] daily-quota hit user_id=%d count=%d limit=%d",
 				userID, todayCount, h.Cfg.MaxCommentsPerDay)
+			// Admin alert: hitting the comment cap is a spam signal.
+			if h.Notify != nil {
+				var uname string
+				h.DB.QueryRow(`SELECT COALESCE(NULLIF(display_name, ''), username) FROM users WHERE id = $1`, userID).Scan(&uname)
+				h.Notify.QuotaHit("komentowania", uname, todayCount, h.Cfg.MaxCommentsPerDay)
+			}
 			w.Header().Set("Retry-After", "3600")
 			http.Error(w, `{"error":"limit komentarzy osiągnięty — spróbuj jutro"}`,
 				http.StatusTooManyRequests)
@@ -123,6 +129,8 @@ func (h *CommentHandler) Create(w http.ResponseWriter, r *http.Request) {
 	// Push notification for the key event: a new comment was posted.
 	if h.Notify != nil {
 		h.Notify.CommentAdded(c.Username, fishID, c.Body)
+		// Admin alert: comment-spam detection (burst detector has a cooldown).
+		h.Notify.CommentBurst(c.Username)
 	}
 
 	writeJSON(w, http.StatusCreated, c)
