@@ -398,6 +398,27 @@ html, body {
   box-shadow: 0 3px 12px rgba(78, 205, 196, 0.3);
 }
 
+/* Fish detail sheet: share / collect actions */
+.fish-sheet-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.btn-share {
+  background: var(--bg-highlight);
+  color: var(--text-primary);
+  border: 2px solid var(--border);
+  box-shadow: none;
+  font-size: 15px;
+}
+
+.btn-share:hover {
+  border-color: #4ECDC4;
+  color: #4ECDC4;
+}
+
 .btn-logout {
   background: var(--bg-secondary);
   color: #E74C3C;

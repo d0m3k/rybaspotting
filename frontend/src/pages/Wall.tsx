@@ -1,9 +1,8 @@
 import { useState, useEffect, useCallback } from 'preact/hooks';
 import { api } from '../api';
-import { setFocusFish } from '../focus';
+import { navigate } from '../router';
 
 interface Props {
-  onGoToMap: () => void;
   myUserId?: number;
   isAdmin?: boolean;
 }
@@ -26,7 +25,7 @@ function previewText(body: string, max = 280): string {
   return body.slice(0, max).trimEnd() + '…';
 }
 
-export function WallPage({ onGoToMap, myUserId, isAdmin }: Props) {
+export function WallPage({ myUserId, isAdmin }: Props) {
   const [items, setItems] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -59,8 +58,7 @@ export function WallPage({ onGoToMap, myUserId, isAdmin }: Props) {
   }
 
   function handleGoToFish(fishId: number) {
-    setFocusFish(fishId);
-    onGoToMap();
+    navigate({ page: 'map', fishId });
   }
 
   return (

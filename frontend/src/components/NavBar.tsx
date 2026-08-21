@@ -1,6 +1,5 @@
 import { h } from 'preact';
-
-type Page = 'login' | 'register' | 'map' | 'spot' | 'upload' | 'leaderboard' | 'wall' | 'profile' | 'admin';
+import { Page } from '../router';
 
 interface NavBarProps {
   current: Page;

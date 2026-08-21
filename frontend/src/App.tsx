@@ -13,8 +13,7 @@ import { AdminStatsPage } from './pages/AdminStats';
 import { PrivacyPolicyPage } from './pages/PrivacyPolicy';
 import { NavBar } from './components/NavBar';
 import { PrivacyBanner } from './components/PrivacyBanner';
-
-type Page = 'login' | 'register' | 'map' | 'spot' | 'upload' | 'leaderboard' | 'wall' | 'profile' | 'admin' | 'privacy';
+import { Page, Route, parseHash, navigate, onHashChange } from './router';
 
 interface UserStats {
   spotted: number;
@@ -27,10 +26,26 @@ interface UserStats {
 
 export function App() {
   const [auth, setAuth] = useState<AuthState | null>(loadAuth);
-  const [page, setPage] = useState<Page>(auth ? 'map' : 'login');
+  // The URL hash drives the UI: `#/map`, `#/fish/{id}`, `#/wall`, ...
+  const [route, setRoute] = useState<Route>(() => parseHash());
   const [allowUpload, setAllowUpload] = useState(false);
   const [stats, setStats] = useState<UserStats | null>(null);
   const [hideNav, setHideNav] = useState(false);
+
+  // Keep the route in sync with the URL hash (back/forward buttons, shared links).
+  useEffect(() => onHashChange(setRoute), []);
+
+  // Auth gating: the hash may point anywhere, but unauthenticated visitors
+  // only ever see login/register/privacy. Deep links like `#/fish/{id}` stay
+  // in `route` so a fresh login drops you straight on the shared fish.
+  const authed = !!auth;
+  let page: Page = route.page;
+  const focusFishId = route.fishId;
+  if (!authed) {
+    if (page !== 'register' && page !== 'privacy') page = 'login';
+  } else if (page === 'login' || page === 'register') {
+    page = 'map';
+  }
 
   // Dark mode
   const [dark, setDark] = useState(() => {
@@ -66,22 +81,26 @@ export function App() {
     saveAuth(state);
     localStorage.setItem('token', state.token);
     setAuth(state);
-    setPage('map');
+    // Keep deep links (`#/fish/{id}`) intact so logging in lands on the fish;
+    // only normalize plain login/register URLs back to the map.
+    if (route.page === 'login' || route.page === 'register') {
+      navigate({ page: 'map' });
+    }
   }
 
   function handleLogout() {
     clearAuth();
     setAuth(null);
     setStats(null);
-    setPage('login');
+    navigate({ page: 'login' });
   }
 
-  function navigate(p: Page) {
+  function navigatePage(p: Page) {
     setHideNav(false);
     if (p === 'profile') {
       refreshStats();
     }
-    setPage(p);
+    navigate({ page: p });
   }
 
   if (!auth) {
@@ -89,9 +108,9 @@ export function App() {
       return (
         <div class="app-container">
           <div class="app-content">
-            <RegisterPage onLogin={() => setPage('login')} onOpenPrivacy={() => setPage('privacy')} />
+            <RegisterPage onLogin={() => navigate({ page: 'login' })} onOpenPrivacy={() => navigate({ page: 'privacy' })} />
           </div>
-          <PrivacyBanner onOpenPolicy={() => setPage('privacy')} />
+          <PrivacyBanner onOpenPolicy={() => navigate({ page: 'privacy' })} />
         </div>
       );
     }
@@ -99,18 +118,18 @@ export function App() {
       return (
         <div class="app-container">
           <div class="app-content">
-            <PrivacyPolicyPage onBack={() => setPage('login')} />
+            <PrivacyPolicyPage onBack={() => navigate({ page: 'login' })} />
           </div>
-          <PrivacyBanner onOpenPolicy={() => setPage('privacy')} />
+          <PrivacyBanner onOpenPolicy={() => navigate({ page: 'privacy' })} />
         </div>
       );
     }
     return (
       <div class="app-container">
         <div class="app-content">
-          <LoginPage onLogin={handleLogin} onRegister={() => setPage('register')} onOpenPrivacy={() => setPage('privacy')} />
+          <LoginPage onLogin={handleLogin} onRegister={() => navigate({ page: 'register' })} onOpenPrivacy={() => navigate({ page: 'privacy' })} />
         </div>
-        <PrivacyBanner onOpenPolicy={() => setPage('privacy')} />
+        <PrivacyBanner onOpenPolicy={() => navigate({ page: 'privacy' })} />
       </div>
     );
   }
@@ -127,7 +146,7 @@ export function App() {
             <button class="dark-toggle" onClick={() => setDark(d => !d)} title={dark ? 'Tryb jasny' : 'Tryb ciemny'}>
               {dark ? '☀️' : '🌙'}
             </button>
-          <button class="profile-widget" onClick={() => navigate('profile')}>
+          <button class="profile-widget" onClick={() => navigatePage('profile')}>
             <span class="profile-widget-name">{displayName}</span>
             {stats && (
               <span class="profile-widget-stats">
@@ -148,17 +167,17 @@ export function App() {
       )}
 
       <div class="app-content">
-        {page === 'map' && <MapPage onStatsChanged={refreshStats} userId={auth.userId} username={auth.username} dark={dark} />}
+        {page === 'map' && <MapPage onStatsChanged={refreshStats} userId={auth.userId} username={auth.username} dark={dark} focusFishId={focusFishId} />}
         {page === 'spot' && <SpotPage onHideNav={setHideNav} onStatsChanged={refreshStats} />}
         {page === 'upload' && allowUpload && <UploadPage onStatsChanged={refreshStats} />}
         {page === 'leaderboard' && <LeaderboardPage />}
-        {page === 'wall' && <WallPage onGoToMap={() => navigate('map')} myUserId={auth.userId} isAdmin={auth.isAdmin} />}
-        {page === 'profile' && <ProfilePage auth={auth} onLogout={handleLogout} onOpenPrivacy={() => setPage('privacy')} />}
+        {page === 'wall' && <WallPage myUserId={auth.userId} isAdmin={auth.isAdmin} />}
+        {page === 'profile' && <ProfilePage auth={auth} onLogout={handleLogout} onOpenPrivacy={() => navigate({ page: 'privacy' })} />}
         {page === 'admin' && <AdminStatsPage />}
-        {page === 'privacy' && <PrivacyPolicyPage onBack={() => setPage(auth ? 'map' : 'login')} />}
+        {page === 'privacy' && <PrivacyPolicyPage onBack={() => navigate({ page: 'map' })} />}
       </div>
-      {!hideNav && page !== 'privacy' && <NavBar current={page} onNavigate={navigate} allowUpload={allowUpload} isAdmin={auth?.isAdmin ?? false} />}
-      <PrivacyBanner onOpenPolicy={() => setPage('privacy')} />
+      {!hideNav && page !== 'privacy' && <NavBar current={page} onNavigate={navigatePage} allowUpload={allowUpload} isAdmin={auth?.isAdmin ?? false} />}
+      <PrivacyBanner onOpenPolicy={() => navigate({ page: 'privacy' })} />
     </div>
   );
 }

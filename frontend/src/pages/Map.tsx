@@ -5,7 +5,7 @@ import { api } from '../api';
 import { distanceMeters } from '../distance';
 import { loadAuth } from '../stores/auth';
 import { mapTiles } from '../mapStyle';
-import { takeFocusFish } from '../focus';
+import { navigate, fishUrl } from '../router';
 
 // Fix Leaflet default icon issue
 delete (L.Icon.Default.prototype as any)._getIconUrl;
@@ -282,7 +282,7 @@ function makeClusterIcon(cl: FishCluster): L.DivIcon {
 
 const CLUSTER_PAGE_SIZE = 5;
 
-export function MapPage({ onStatsChanged, userId, username, dark }: { onStatsChanged?: () => void; userId?: number; username?: string; dark?: boolean }) {
+export function MapPage({ onStatsChanged, userId, username, dark, focusFishId }: { onStatsChanged?: () => void; userId?: number; username?: string; dark?: boolean; focusFishId?: number }) {
   const mapRef = useRef<L.Map | null>(null);
   const tileRef = useRef<L.TileLayer | null>(null);
   const markersRef = useRef<L.Layer[]>([]);
@@ -307,6 +307,9 @@ export function MapPage({ onStatsChanged, userId, username, dark }: { onStatsCha
   const locMarkerRef = useRef<L.Marker | null>(null);
   const locCircleRef = useRef<L.Circle | null>(null);
   const lastLocRef = useRef<L.LatLng | null>(null);
+  // Tracks the fish id currently shown via the URL (`#/fish/{id}`) so the
+  // deep-link effect below doesn't re-focus a fish we just opened by click.
+  const lastFocusedIdRef = useRef<number | undefined>(undefined);
 
   useEffect(() => {
     const map = L.map('map').setView([50.0647, 19.9450], 13);
@@ -440,26 +443,10 @@ export function MapPage({ onStatsChanged, userId, username, dark }: { onStatsCha
         icon: fishMarkerIcon(f, userId, collectedFishIds),
       })
         .addTo(map)
-        .on('click', async () => {
-          setClusterDetail(null);
-          setSelectedFish(f);
-          setFishDetail(null);
-          setComments([]);
-          setDetailLoading(true);
-          try {
-            const detail = await api.getFish(f.id);
-            setFishDetail(detail);
-          } catch (err) {
-            console.error('Failed to load fish detail', err);
-            setFishDetail(null);
-          } finally {
-            setDetailLoading(false);
-          }
-          setCommentsLoading(true);
-          api.listComments(f.id)
-            .then(list => setComments(list || []))
-            .catch(() => setComments([]))
-            .finally(() => setCommentsLoading(false));
+        .on('click', () => {
+          lastFocusedIdRef.current = f.id;
+          focusFish(f.id);
+          navigate({ page: 'map', fishId: f.id });
         });
       markersRef.current.push(marker);
     }
@@ -578,6 +565,46 @@ export function MapPage({ onStatsChanged, userId, username, dark }: { onStatsCha
     }
   }
 
+  // ── Share / close ───────────────────────────────────────────────────────
+
+  /** Close the detail sheet and drop `#/fish/{id}` from the URL. */
+  function closeFishSheet() {
+    lastFocusedIdRef.current = undefined;
+    setSelectedFish(null);
+    setFishDetail(null);
+    setClusterDetail(null);
+    navigate({ page: 'map' });
+  }
+
+  /** Share the fish via the native share sheet, falling back to clipboard. */
+  async function shareFish(fish: any) {
+    const url = fishUrl(fish.id);
+    const title = `Ryba z Dupom #${fish.id}`;
+    const text = fish.address_hint
+      ? `🐟 Ryba z Dupom #${fish.id} — ${fish.address_hint} (spotter: ${fish.spotter_name || '?'})`
+      : `🐟 Ryba z Dupom #${fish.id} (spotter: ${fish.spotter_name || '?'})`;
+    if (navigator.share) {
+      try {
+        await navigator.share({ title, text, url });
+      } catch {
+        /* user dismissed the share sheet — nothing to copy */
+      }
+      return;
+    }
+    // Fallback: copy to clipboard
+    try {
+      await navigator.clipboard.writeText(`${text}\n${url}`);
+    } catch {
+      const ta = document.createElement('textarea');
+      ta.value = url;
+      document.body.appendChild(ta);
+      ta.select();
+      try { document.execCommand('copy'); } catch { /* last resort */ }
+      document.body.removeChild(ta);
+    }
+    alert('Link skopiowany do schowka! 📋');
+  }
+
   // ── Paginated cluster fish ──────────────────────────────────────────────
 
   const clusterTotalPages = clusterDetail ? Math.ceil(clusterDetail.count / CLUSTER_PAGE_SIZE) : 0;
@@ -586,39 +613,29 @@ export function MapPage({ onStatsChanged, userId, username, dark }: { onStatsCha
     : [];
 
   function openFishFromCluster(f: any) {
-    setClusterDetail(null);
-    setSelectedFish(f);
-    setFishDetail(null);
-    setComments([]);
-    setDetailLoading(true);
-    api.getFish(f.id)
-      .then(d => setFishDetail(d))
-      .catch(() => setFishDetail(null))
-      .finally(() => setDetailLoading(false));
-    setCommentsLoading(true);
-    api.listComments(f.id)
-      .then(list => setComments(list || []))
-      .catch(() => setComments([]))
-      .finally(() => setCommentsLoading(false));
+    lastFocusedIdRef.current = f.id;
+    focusFish(f.id);
+    navigate({ page: 'map', fishId: f.id });
   }
 
-  // ── Pending focus from the Wall (fly to a fish on mount) ───────────────
-  useEffect(() => {
-    const id = takeFocusFish();
-    if (!id) return;
+  // ── Deep-link focus (shared URL / back button / Wall) ─────────────────
+  // `focusFishId` mirrors `#/fish/{id}` from the URL hash. When it appears we
+  // fly to that fish and open its detail sheet; when it disappears (back
+  // button / navigating to plain `#/map`) we close the sheet.
+  function focusFish(id: number) {
     const map = mapRef.current;
-    if (!map) return;
+    setClusterDetail(null);
     setSelectedFish(null);
     setFishDetail(null);
     setComments([]);
     setDetailLoading(true);
     api.getFish(id)
       .then((f: any) => {
-        if (f && f.latitude != null && f.longitude != null) {
+        if (f && f.id != null && f.latitude != null && f.longitude != null && map) {
           map.setView([f.latitude, f.longitude], Math.max(map.getZoom(), 18), { animate: true });
-          setSelectedFish(f);
-          setFishDetail(f);
         }
+        setSelectedFish(f);
+        setFishDetail(f);
       })
       .catch(() => {})
       .finally(() => setDetailLoading(false));
@@ -627,7 +644,20 @@ export function MapPage({ onStatsChanged, userId, username, dark }: { onStatsCha
       .then(list => setComments(list || []))
       .catch(() => setComments([]))
       .finally(() => setCommentsLoading(false));
-  }, []);
+  }
+
+  useEffect(() => {
+    if (focusFishId != null) {
+      lastFocusedIdRef.current = focusFishId;
+      focusFish(focusFishId);
+    } else if (lastFocusedIdRef.current !== undefined) {
+      lastFocusedIdRef.current = undefined;
+      setSelectedFish(null);
+      setFishDetail(null);
+      setClusterDetail(null);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [focusFishId]);
 
   // ── Comment actions ───────────────────────────────────────────────────
   async function handleCommentSubmit(fishId: number) {
@@ -757,7 +787,7 @@ export function MapPage({ onStatsChanged, userId, username, dark }: { onStatsCha
 
         return (
         <div class="bottom-sheet">
-          <button class="close-btn" onClick={() => { setSelectedFish(null); setFishDetail(null); }}>✕</button>
+          <button class="close-btn" onClick={closeFishSheet}>✕</button>
           <img
             src={selectedFish.photo_url || `/api/photos/${selectedFish.photo_filename}`}
             alt="Ryba"
@@ -845,14 +875,19 @@ export function MapPage({ onStatsChanged, userId, username, dark }: { onStatsCha
             </div>
           </div>
 
-          {canCollect && (
-            <button
-              class="btn btn-primary"
-              onClick={() => handleCollect(selectedFish.id, selectedFish.latitude, selectedFish.longitude)}
-            >
-              Collect! 🎣
+          <div class="fish-sheet-actions">
+            <button class="btn btn-share" onClick={() => shareFish(selectedFish)}>
+              📤 Udostępnij rybkę
             </button>
-          )}
+            {canCollect && (
+              <button
+                class="btn btn-primary"
+                onClick={() => handleCollect(selectedFish.id, selectedFish.latitude, selectedFish.longitude)}
+              >
+                Collect! 🎣
+              </button>
+            )}
+          </div>
         </div>
         );
       })()}
