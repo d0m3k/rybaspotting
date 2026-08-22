@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, useCallback } from 'preact/hooks';
+import { useEffect, useRef, useState, useCallback, useLayoutEffect } from 'preact/hooks';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { api } from '../api';
@@ -637,7 +637,6 @@ export function MapPage({ onStatsChanged, userId, username, dark, focusFishId }:
   // fly to that fish and open its detail sheet; when it disappears (back
   // button / navigating to plain `#/map`) we close the sheet.
   function focusFish(id: number) {
-    const map = mapRef.current;
     setClusterDetail(null);
     setSelectedFish(null);
     setFishDetail(null);
@@ -645,11 +644,13 @@ export function MapPage({ onStatsChanged, userId, username, dark, focusFishId }:
     setDetailLoading(true);
     api.getFish(id)
       .then((f: any) => {
-        if (f && f.id != null && f.latitude != null && f.longitude != null && map) {
-          map.setView([f.latitude, f.longitude], Math.max(map.getZoom(), 18), { animate: true });
+        // No setView here — the recenter happens in the useLayoutEffect below,
+        // once the details sheet is rendered, so the marker lands in the
+        // visible band ABOVE the panel (not under it).
+        if (f && f.id != null && f.latitude != null && f.longitude != null) {
+          setSelectedFish(f);
+          setFishDetail(f);
         }
-        setSelectedFish(f);
-        setFishDetail(f);
       })
       .catch(() => {})
       .finally(() => setDetailLoading(false));
@@ -659,6 +660,26 @@ export function MapPage({ onStatsChanged, userId, username, dark, focusFishId }:
       .catch(() => setComments([]))
       .finally(() => setCommentsLoading(false));
   }
+
+  // ── Center the map on the fish ABOVE the bottom sheet ─────────────────
+  // Centering at the map centre is wrong here: the fish details sheet opens in
+  // the same gesture and covers the bottom of the screen, so the marker ends up
+  // hidden behind the panel. Instead we wait for the sheet to render, measure
+  // its real height, and place the fish at the centre of the visible band above
+  // it. Sheets are capped at 55vh, so even when async content (comments,
+  // collectors) grows the panel a moment later the marker stays visible.
+  useLayoutEffect(() => {
+    const map = mapRef.current;
+    if (!map || !selectedFish) return;
+    const sheet = document.querySelector('.bottom-sheet');
+    const sheetH = sheet ? sheet.getBoundingClientRect().height : window.innerHeight * 0.55;
+    const visibleTop = window.innerHeight - sheetH;             // panel's top edge
+    const offsetPx = visibleTop / 2 - window.innerHeight / 2;   // negative → marker up
+    const zoom = Math.max(map.getZoom(), 18);
+    const pt = map.project([selectedFish.latitude, selectedFish.longitude], zoom);
+    pt.y += offsetPx;
+    map.setView(map.unproject(pt, zoom), zoom, { animate: true });
+  }, [selectedFish]);
 
   useEffect(() => {
     if (focusFishId != null) {
