@@ -673,11 +673,14 @@ export function MapPage({ onStatsChanged, userId, username, dark, focusFishId }:
     if (!map || !selectedFish) return;
     const sheet = document.querySelector('.bottom-sheet');
     const sheetH = sheet ? sheet.getBoundingClientRect().height : window.innerHeight * 0.55;
-    const visibleTop = window.innerHeight - sheetH;             // panel's top edge
-    const offsetPx = visibleTop / 2 - window.innerHeight / 2;   // negative → marker up
+    const visibleTop = window.innerHeight - sheetH;                 // panel's top edge
+    // Leaflet pixel-space y grows SOUTHWARD, so to place the fish ABOVE the
+    // screen centre, the view centre must sit SOUTH of the fish by the same
+    // amount. shiftPx = how far the centre moves south of the fish.
+    const shiftPx = window.innerHeight / 2 - visibleTop / 2;
     const zoom = Math.max(map.getZoom(), 18);
     const pt = map.project([selectedFish.latitude, selectedFish.longitude], zoom);
-    pt.y += offsetPx;
+    pt.y += shiftPx;
     map.setView(map.unproject(pt, zoom), zoom, { animate: true });
   }, [selectedFish]);
 
