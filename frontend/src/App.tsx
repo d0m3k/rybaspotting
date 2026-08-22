@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'preact/hooks';
-import { loadAuth, clearAuth, saveAuth, AuthState } from './stores/auth';
+import { loadAuth, clearAuth, saveAuth, AuthState, goToLogin, consumeLoginReturn } from './stores/auth';
 import { api } from './api';
 import { LoginPage } from './pages/Login';
 import { RegisterPage } from './pages/Register';
@@ -35,14 +35,18 @@ export function App() {
   // Keep the route in sync with the URL hash (back/forward buttons, shared links).
   useEffect(() => onHashChange(setRoute), []);
 
-  // Auth gating: the hash may point anywhere, but unauthenticated visitors
-  // only ever see login/register/privacy. Deep links like `#/fish/{id}` stay
-  // in `route` so a fresh login drops you straight on the shared fish.
+  // Auth gating: the hash may point anywhere. Logged-in users can go
+  // everywhere; guests get a READ-ONLY view of the public data — map (incl.
+  // `#/fish/{id}` deep links), wall and leaderboard — and only the truly
+  // interactive pages (spot / upload / profile / admin) redirect to login.
+  // Deep links like `#/fish/{id}` stay in `route` so a fresh login drops you
+  // straight on the shared fish.
   const authed = !!auth;
+  const GUEST_VIEW = new Set<Page>(['map', 'wall', 'leaderboard', 'login', 'register', 'privacy']);
   let page: Page = route.page;
   const focusFishId = route.fishId;
   if (!authed) {
-    if (page !== 'register' && page !== 'privacy') page = 'login';
+    if (!GUEST_VIEW.has(page)) page = 'login';
   } else if (page === 'login' || page === 'register') {
     page = 'map';
   }
@@ -81,9 +85,14 @@ export function App() {
     saveAuth(state);
     localStorage.setItem('token', state.token);
     setAuth(state);
-    // Keep deep links (`#/fish/{id}`) intact so logging in lands on the fish;
-    // only normalize plain login/register URLs back to the map.
-    if (route.page === 'login' || route.page === 'register') {
+    // If the user came here from a guest CTA ("zaloguj się, żeby…"), return
+    // them to the view they were on — e.g. a shared #/fish/{id}.
+    const ret = consumeLoginReturn();
+    if (ret && ret.startsWith('#') && ret !== location.hash) {
+      location.hash = ret;
+    } else if (route.page === 'login' || route.page === 'register') {
+      // Keep deep links (`#/fish/{id}`) intact so logging in lands on the fish;
+      // only normalize plain login/register URLs back to the map.
       navigate({ page: 'map' });
     }
   }
@@ -99,6 +108,11 @@ export function App() {
     setHideNav(false);
     if (p === 'profile') {
       refreshStats();
+    }
+    if (p === 'login') {
+      // Guest navigating to login from the nav — remember where they were.
+      goToLogin();
+      return;
     }
     navigate({ page: p });
   }
@@ -124,11 +138,50 @@ export function App() {
         </div>
       );
     }
+    if (page === 'login') {
+      return (
+        <div class="app-container">
+          <div class="app-content">
+            <LoginPage
+              onLogin={handleLogin}
+              onRegister={() => navigate({ page: 'register' })}
+              onOpenPrivacy={() => navigate({ page: 'privacy' })}
+              onGuest={() => {
+                // plain "browse without an account" — no return-to afterwards
+                try { sessionStorage.removeItem('rybaspotting_return'); } catch { /* ignore */ }
+                navigate({ page: 'map' });
+              }}
+            />
+          </div>
+          <PrivacyBanner onOpenPolicy={() => navigate({ page: 'privacy' })} />
+        </div>
+      );
+    }
+
+    // ── Guest — read-only view of public data with auth prompts ────────
+    // Map (incl. `#/fish/{id}` deep links), Wall and Leaderboard are public
+    // API-wise; interactive UI (collect, comment, spot) is replaced by
+    // login CTAs in the pages themselves.
     return (
       <div class="app-container">
+        <header class="top-bar">
+          <div class="top-bar-brand">🐟 Ryby z Dupom</div>
+          <div style="display:flex;align-items:center;gap:6px;">
+            <button class="dark-toggle" onClick={() => setDark(d => !d)} title={dark ? 'Tryb jasny' : 'Tryb ciemny'}>
+              {dark ? '☀️' : '🌙'}
+            </button>
+            <button class="top-bar-auth-btn" onClick={() => goToLogin()} title="Zaloguj się">Zaloguj się</button>
+            <button class="top-bar-auth-btn top-bar-auth-primary" onClick={() => navigate({ page: 'register' })} title="Załóż konto">✨ Dołącz</button>
+          </div>
+        </header>
+
         <div class="app-content">
-          <LoginPage onLogin={handleLogin} onRegister={() => navigate({ page: 'register' })} onOpenPrivacy={() => navigate({ page: 'privacy' })} />
+          {page === 'map' && <MapPage dark={dark} focusFishId={focusFishId} />}
+          {page === 'wall' && <WallPage />}
+          {page === 'leaderboard' && <LeaderboardPage />}
         </div>
+
+        <NavBar current={page} onNavigate={navigatePage} allowUpload={false} isAdmin={false} guest />
         <PrivacyBanner onOpenPolicy={() => navigate({ page: 'privacy' })} />
       </div>
     );

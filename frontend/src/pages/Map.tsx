@@ -3,7 +3,7 @@ import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { api } from '../api';
 import { distanceMeters } from '../distance';
-import { loadAuth } from '../stores/auth';
+import { loadAuth, goToLogin } from '../stores/auth';
 import { mapTiles } from '../mapStyle';
 import { navigate, fishUrl } from '../router';
 
@@ -819,6 +819,7 @@ export function MapPage({ onStatsChanged, userId, username, dark, focusFishId }:
       {/* ── Single fish bottom sheet ─────────────────────────────────── */}
       {selectedFish && (() => {
         const isOwnFish = userId != null && selectedFish.spotted_by === userId;
+        const isGuest = userId == null;
         const hasCollected = collectedFishIds.has(Number(selectedFish.id)) ||
           (fishDetail?.collectors?.some((c: any) => c.username === username) ?? false);
         const canCollect = !isOwnFish && !hasCollected && !detailLoading;
@@ -896,22 +897,37 @@ export function MapPage({ onStatsChanged, userId, username, dark, focusFishId }:
             </div>
 
             <div class="fish-comment-form">
-              <textarea
-                class="input fish-comment-input"
-                placeholder="Napisz komentarz… (max 2000 znaków)"
-                maxLength={2000}
-                rows={2}
-                value={commentText}
-                onInput={(e: any) => setCommentText(e.target.value)}
-              />
-              <button
-                class="btn btn-primary"
-                style={{ marginTop: 0, padding: '10px', fontSize: '14px' }}
-                disabled={commentSending || !commentText.trim()}
-                onClick={() => handleCommentSubmit(selectedFish.id)}
-              >
-                {commentSending ? 'Wysyłanie…' : 'Dodaj komentarz'}
-              </button>
+              {userId == null ? (
+                <div class="fish-comment-guest">
+                  <p class="muted" style="margin:0 0 8px;">💬 Komentowanie dostępne po zalogowaniu.</p>
+                  <button
+                    class="btn btn-primary"
+                    style={{ marginTop: 0, padding: '10px', fontSize: '14px' }}
+                    onClick={goToLogin}
+                  >
+                    Zaloguj się, żeby skomentować
+                  </button>
+                </div>
+              ) : (
+                <>
+                  <textarea
+                    class="input fish-comment-input"
+                    placeholder="Napisz komentarz… (max 2000 znaków)"
+                    maxLength={2000}
+                    rows={2}
+                    value={commentText}
+                    onInput={(e: any) => setCommentText(e.target.value)}
+                  />
+                  <button
+                    class="btn btn-primary"
+                    style={{ marginTop: 0, padding: '10px', fontSize: '14px' }}
+                    disabled={commentSending || !commentText.trim()}
+                    onClick={() => handleCommentSubmit(selectedFish.id)}
+                  >
+                    {commentSending ? 'Wysyłanie…' : 'Dodaj komentarz'}
+                  </button>
+                </>
+              )}
             </div>
           </div>
 
@@ -919,7 +935,15 @@ export function MapPage({ onStatsChanged, userId, username, dark, focusFishId }:
             <button class="btn btn-share" onClick={() => shareFish(selectedFish)}>
               📤 Udostępnij rybkę
             </button>
-            {canCollect && (
+            {isGuest ? (
+              <button
+                class="btn btn-primary"
+                onClick={goToLogin}
+                title="Collecting wymaga konta"
+              >
+                Zaloguj się, żeby zbierać 🎣
+              </button>
+            ) : canCollect && (
               <button
                 class="btn btn-primary"
                 onClick={() => handleCollect(selectedFish.id, selectedFish.latitude, selectedFish.longitude)}

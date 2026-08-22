@@ -1,5 +1,7 @@
 // Simple auth store backed by localStorage
 
+import { navigate } from '../router';
+
 export interface AuthState {
   token: string;
   userId: number;
@@ -36,4 +38,27 @@ export function getToken(): string | null {
 
 export function isLoggedIn(): boolean {
   return getToken() !== null;
+}
+
+const LOGIN_RETURN_KEY = 'rybaspotting_return';
+
+/** Go to the login screen, remembering the current view so a successful
+ *  login can drop the user back where they were (e.g. a shared #/fish/{id}). */
+export function goToLogin(): void {
+  try {
+    sessionStorage.setItem(LOGIN_RETURN_KEY, location.hash);
+  } catch { /* private mode — return-to just won't work */ }
+  navigate({ page: 'login' });
+}
+
+/** After a successful login, return the remembered view hash (if any).
+ *  Consumes the stored value — one return per login. */
+export function consumeLoginReturn(): string | null {
+  try {
+    const ret = sessionStorage.getItem(LOGIN_RETURN_KEY);
+    if (ret) sessionStorage.removeItem(LOGIN_RETURN_KEY);
+    return ret;
+  } catch {
+    return null;
+  }
 }

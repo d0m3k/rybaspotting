@@ -7,9 +7,10 @@ interface Props {
   onLogin: (state: AuthState) => void;
   onRegister: () => void;
   onOpenPrivacy: () => void;
+  onGuest?: () => void;
 }
 
-export function LoginPage({ onLogin, onRegister, onOpenPrivacy }: Props) {
+export function LoginPage({ onLogin, onRegister, onOpenPrivacy, onGuest }: Props) {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -74,6 +75,14 @@ export function LoginPage({ onLogin, onRegister, onOpenPrivacy }: Props) {
             Zarejestruj się
           </span>
         </p>
+        {onGuest && (
+          <p class="auth-link">
+            Chcesz tylko zobaczyć ryby?{' '}
+            <span onClick={(e) => { e.preventDefault(); onGuest(); }}>
+              Przeglądaj bez konta 🗺️
+            </span>
+          </p>
+        )}
       </div>
 
       {/* Welcome / About section — always visible */}

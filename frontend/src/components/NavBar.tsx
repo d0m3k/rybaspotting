@@ -6,9 +6,11 @@ interface NavBarProps {
   onNavigate: (p: Page) => void;
   allowUpload: boolean;
   isAdmin: boolean;
+  /** Guest (logged-out) mode: the Spot button becomes a login CTA. */
+  guest?: boolean;
 }
 
-export function NavBar({ current, onNavigate, allowUpload, isAdmin }: NavBarProps) {
+export function NavBar({ current, onNavigate, allowUpload, isAdmin, guest }: NavBarProps) {
   // Left-side tabs — always just Mapa
   const leftTabs: { page: Page; label: string; icon: string }[] = [
     { page: 'map', label: 'Mapa', icon: '🗺️' },
@@ -47,16 +49,32 @@ export function NavBar({ current, onNavigate, allowUpload, isAdmin }: NavBarProp
         ))}
       </div>
 
-      {/* Center Spot button */}
+      {/* Center Spot button — for guests a login CTA (spotting needs an account) */}
       <div class="nav-center">
-        <button
-          class={`nav-spot-btn ${isSpotActive ? 'active' : ''}`}
-          onClick={() => onNavigate('spot')}
-          aria-label="Spotuj rybę"
-        >
-          <span class="nav-spot-icon">📸</span>
-        </button>
-        <span class="nav-spot-label">Spot</span>
+        {guest ? (
+          <>
+            <button
+              class="nav-spot-btn"
+              onClick={() => onNavigate('login')}
+              aria-label="Zaloguj się"
+              title="Zaloguj się, żeby spotować ryby"
+            >
+              <span class="nav-spot-icon">👤</span>
+            </button>
+            <span class="nav-spot-label">Zaloguj</span>
+          </>
+        ) : (
+          <>
+            <button
+              class={`nav-spot-btn ${isSpotActive ? 'active' : ''}`}
+              onClick={() => onNavigate('spot')}
+              aria-label="Spotuj rybę"
+            >
+              <span class="nav-spot-icon">📸</span>
+            </button>
+            <span class="nav-spot-label">Spot</span>
+          </>
+        )}
       </div>
 
       {/* Right side — Ranking + extras */}

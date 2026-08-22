@@ -682,7 +682,32 @@ html.dark .map-edge-indicator {
   transform-origin: center;
 }
 
-/* === Bottom Sheet === */
+/* Guest auth buttons in the top bar (logged-out read-only mode) */
+.top-bar-auth-btn {
+  border: none;
+  border-radius: 12px;
+  padding: 8px 14px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  background: rgba(78, 205, 196, 0.15);
+  color: #4ECDC4;
+  transition: background 0.2s;
+  white-space: nowrap;
+}
+.top-bar-auth-btn:hover { background: rgba(78, 205, 196, 0.28); }
+.top-bar-auth-primary { background: #4ECDC4; color: #0a1420; }
+.top-bar-auth-primary:hover { background: #6bd9d1; }
+
+/* Guest login prompt inside the fish sheet */
+.fish-comment-guest {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+}
+
+/* Bottom Sheet */
 .bottom-sheet {
   position: absolute;
   bottom: 0;
