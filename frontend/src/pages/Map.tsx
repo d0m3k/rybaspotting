@@ -288,6 +288,7 @@ export function MapPage({ onStatsChanged, userId, username, dark, focusFishId }:
   const markersRef = useRef<L.Layer[]>([]);
   const [fishList, setFishList] = useState<any[]>([]);
   const [selectedFish, setSelectedFish] = useState<any | null>(null);
+  const [fullPhoto, setFullPhoto] = useState<string | null>(null);
   const [fishDetail, setFishDetail] = useState<any | null>(null);
   const [loading, setLoading] = useState(true);
   const [detailLoading, setDetailLoading] = useState(false);
@@ -568,6 +569,19 @@ export function MapPage({ onStatsChanged, userId, username, dark, focusFishId }:
   // ── Share / close ───────────────────────────────────────────────────────
 
   /** Close the detail sheet and drop `#/fish/{id}` from the URL. */
+  // ── Full-size photo lightbox ──────────────────────────────────────────
+  // The sheet preview is cropped (object-fit: cover), so tapping the image
+  // opens a full-screen "contain" view with the whole photo. Esc or tap the
+  // backdrop to close.
+  useEffect(() => {
+    if (!fullPhoto) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setFullPhoto(null);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [fullPhoto]);
+
   function closeFishSheet() {
     lastFocusedIdRef.current = undefined;
     setSelectedFish(null);
@@ -792,6 +806,8 @@ export function MapPage({ onStatsChanged, userId, username, dark, focusFishId }:
             src={selectedFish.photo_url || `/api/photos/${selectedFish.photo_filename}`}
             alt="Ryba"
             class="fish-preview"
+            onClick={() => setFullPhoto(selectedFish.photo_url || `/api/photos/${selectedFish.photo_filename}`)}
+            title="Kliknij, aby zobaczyć całość"
           />
           <p class="fish-spotter">🐟 Spotter: {selectedFish.spotter_name}</p>
           <p class="fish-date">
@@ -891,6 +907,28 @@ export function MapPage({ onStatsChanged, userId, username, dark, focusFishId }:
         </div>
         );
       })()}
+
+      {/* ── Full-size photo lightbox ─────────────────────────────────── */}
+      {fullPhoto && (
+        <div
+          class="photo-lightbox"
+          role="dialog"
+          aria-modal="true"
+          onClick={() => setFullPhoto(null)}
+        >
+          <button
+            class="photo-lightbox-close"
+            onClick={() => setFullPhoto(null)}
+            title="Zamknij (Esc)"
+          >✕</button>
+          <img
+            src={fullPhoto}
+            alt="Ryba — pełny podgląd"
+            class="photo-lightbox-img"
+            onClick={(e) => e.stopPropagation()}
+          />
+        </div>
+      )}
     </div>
   );
 }
