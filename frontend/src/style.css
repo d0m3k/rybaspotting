@@ -2029,6 +2029,70 @@ h3 {
   font-size: 14px;
 }
 .wall-list { display: flex; flex-direction: column; gap: 10px; }
+
+/* Newest fish strip — quick links to the latest spots (#/fish/{id}) */
+.wall-latest { margin-bottom: 18px; }
+.wall-latest-title {
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-secondary);
+  margin: 0 0 8px;
+}
+.wall-latest-list {
+  display: flex;
+  gap: 10px;
+  overflow-x: auto;
+  padding-bottom: 6px;
+}
+.wall-latest-card {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 136px;
+  max-width: 160px;
+  flex: 1 0 136px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 10px;
+  cursor: pointer;
+  transition: transform 0.12s ease, border-color 0.12s ease;
+}
+.wall-latest-card:hover {
+  transform: translateY(-2px);
+  border-color: rgba(78, 205, 196, 0.6);
+}
+.wall-latest-thumb {
+  width: 100%;
+  height: 84px;
+  object-fit: cover;
+  border-radius: 8px;
+  background: var(--bg-secondary);
+}
+.wall-latest-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.wall-latest-name { font-weight: 700; font-size: 13px; color: #4ECDC4; }
+.wall-latest-addr {
+  font-size: 12px;
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.wall-latest-who {
+  font-size: 11px;
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 .wall-card {
   display: flex;
   gap: 12px;
@@ -2072,7 +2136,8 @@ h3 {
   margin-bottom: 4px;
 }
 .wall-author { font-weight: 700; font-size: 14px; }
-.wall-fish { color: var(--text-secondary); }
+.wall-fish { color: var(--text-secondary); cursor: pointer; }
+.wall-fish:hover { text-decoration: underline; }
 .wall-time { color: var(--text-muted); margin-left: auto; }
 .wall-text {
   font-size: 14px;

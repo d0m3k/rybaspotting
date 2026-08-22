@@ -27,6 +27,7 @@ function previewText(body: string, max = 280): string {
 
 export function WallPage({ myUserId, isAdmin }: Props) {
   const [items, setItems] = useState<any[]>([]);
+  const [latest, setLatest] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
@@ -34,8 +35,10 @@ export function WallPage({ myUserId, isAdmin }: Props) {
     setLoading(true);
     setError('');
     try {
-      const list = await api.recentComments(50);
+      // Comments wall + the newest fish strip, loaded in parallel.
+      const [list, newest] = await Promise.all([api.recentComments(50), api.listFish(1, 6)]);
       setItems(list);
+      setLatest(newest);
     } catch (err: any) {
       setError(err?.message || 'Nie udało się załadować komentarzy');
     } finally {
@@ -71,6 +74,28 @@ export function WallPage({ myUserId, isAdmin }: Props) {
       {loading && <div class="wall-loading">Ładowanie…</div>}
       {error && <div class="error-msg">{error}</div>}
 
+      {!loading && !error && latest.length > 0 && (
+        <div class="wall-latest">
+          <h3 class="wall-latest-title">🐟 Najnowsze ryby</h3>
+          <div class="wall-latest-list">
+            {latest.map((f) => (
+              <div class="wall-latest-card" key={f.id} onClick={() => handleGoToFish(f.id)} role="link" tabIndex={0} onKeyDown={(e) => { if (e.key === 'Enter') handleGoToFish(f.id); }}>
+                <img
+                  src={f.photo_url || `/api/photos/${f.photo_filename}`}
+                  alt=""
+                  class="wall-latest-thumb"
+                />
+                <div class="wall-latest-meta">
+                  <span class="wall-latest-name">Ryba #{f.id}</span>
+                  <span class="wall-latest-addr">{f.address_hint ? previewText(f.address_hint, 40) : 'brak adresu'}</span>
+                  <span class="wall-latest-who">{f.spotter_name} · {timeAgo(f.created_at)}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {!loading && !error && items.length === 0 && (
         <div class="wall-empty">Jeszcze nikt nie skomentował żadnej rybki 🐟</div>
       )}
@@ -92,7 +117,7 @@ export function WallPage({ myUserId, isAdmin }: Props) {
               <div class="wall-body">
                 <div class="wall-meta">
                   <span class="wall-author">{c.username}</span>
-                  <span class="wall-fish">↳ ryba #{c.fish_id} ({c.spotter_name})</span>
+                  <span class="wall-fish" onClick={() => handleGoToFish(c.fish_id)} title="Pokaż na mapie">↳ ryba #{c.fish_id} ({c.spotter_name})</span>
                   <span class="wall-time">{timeAgo(c.created_at)}</span>
                 </div>
                 <p class="wall-text">{previewText(c.body)}</p>

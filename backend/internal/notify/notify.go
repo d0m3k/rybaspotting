@@ -48,8 +48,10 @@ type Notifier struct {
 //   - appToken:  an application token (pushover.net → Your Applications →
 //                Create an Application)
 //
-// baseURL is used as the tap-through link inside notifications (the app's
-// public origin, e.g. https://ryby.dom3k.pl).
+// baseURL is the app's public origin (e.g. https://ryby.dom3k.pl). For events
+// tied to a specific spot it gets combined with the hash route (#/fish/{id})
+// so tapping the notification opens that exact fish on the map; other events
+// fall back to the app home.
 func New(userKey, appToken, baseURL string) *Notifier {
 	userKey = strings.TrimSpace(userKey)
 	appToken = strings.TrimSpace(appToken)
@@ -80,15 +82,16 @@ func (n *Notifier) FishSpotted(spotter, address string, fishID int, lat, lng flo
 		msg += fmt.Sprintf(" przy %s", address)
 	}
 	msg += fmt.Sprintf("\n📍 %.5f, %.5f", lat, lng)
-	n.post("Nowa ryba z dupom!", msg, 0, "")
+	n.post("Nowa ryba z dupom!", msg, 0, "", n.fishLink(fishID), "Pokaż rybę 🐟")
 }
 
-// UserRegistered notifies about a new account.
+// UserRegistered notifies about a new account. No fish to link to — the
+// notification falls back to the app home.
 func (n *Notifier) UserRegistered(username string) {
 	if n == nil {
 		return
 	}
-	n.post("Nowy użytkownik 👤", fmt.Sprintf("Zarejestrował się: %s", username), 0, "")
+	n.post("Nowy użytkownik 👤", fmt.Sprintf("Zarejestrował się: %s", username), 0, "", "", "")
 }
 
 // CommentAdded notifies about a new comment on a fish.
@@ -100,7 +103,7 @@ func (n *Notifier) CommentAdded(username string, fishID int, body string) {
 	if r := []rune(body); len(r) > 140 {
 		body = string(r[:140]) + "…"
 	}
-	n.post("Nowy komentarz 💬", fmt.Sprintf("%s na rybie #%d:\n%s", username, fishID, body), 0, "")
+	n.post("Nowy komentarz 💬", fmt.Sprintf("%s na rybie #%d:\n%s", username, fishID, body), 0, "", n.fishLink(fishID), "Pokaż rybę 💬")
 }
 
 // FishCollected notifies about a fish being collected by another user.
@@ -112,7 +115,7 @@ func (n *Notifier) FishCollected(collector string, fishID int, address string) {
 	if address != "" {
 		msg += fmt.Sprintf(" (%s)", address)
 	}
-	n.post("Ryba zebrana!", msg, 0, "")
+	n.post("Ryba zebrana!", msg, 0, "", n.fishLink(fishID), "Pokaż rybę ✅")
 }
 
 // ── Admin alerts (priority 1, siren) ────────────────────────────────────
@@ -175,16 +178,31 @@ func (n *Notifier) CommentBurst(username string) {
 }
 
 // sendAdmin pushes a high-priority alert: bypasses quiet hours, distinct sound.
+// No specific fish to link to — the tap-through defaults to the app home.
 func (n *Notifier) sendAdmin(title, message string) {
-	n.post(title, message, 1, "siren")
+	n.post(title, message, 1, "siren", "", "")
 }
 
 // ── transport ───────────────────────────────────────────────────────────
 
+// fishLink builds a deep link to one fish using the hash router added in
+// frontend/src/router.ts: {baseURL}#/fish/{id}. The hash survives PWA
+// navigation, so tapping the notification opens the map centred on that spot.
+func (n *Notifier) fishLink(id int) string {
+	if n.baseURL == "" || id <= 0 {
+		return ""
+	}
+	return fmt.Sprintf("%s#/fish/%d", n.baseURL, id)
+}
+
 // post pushes a message asynchronously so it never blocks the HTTP request.
 // Failures are logged and swallowed — a notification hiccup must not break a
 // successful API response.
-func (n *Notifier) post(title, message string, priority int, sound string) {
+//
+// link/linkTitle make the notification tappable (Pushover supports one link).
+// When link is empty it defaults to the app home so a notification never ends
+// up with a dead tap.
+func (n *Notifier) post(title, message string, priority int, sound, link, linkTitle string) {
 	go func() {
 		form := url.Values{}
 		form.Set("token", n.appToken)
@@ -197,9 +215,12 @@ func (n *Notifier) post(title, message string, priority int, sound string) {
 		if sound != "" {
 			form.Set("sound", sound)
 		}
-		if n.baseURL != "" {
-			form.Set("url", n.baseURL)
-			form.Set("url_title", "Otwórz Rybaspotting")
+		if link == "" {
+			link, linkTitle = n.baseURL, "Otwórz Rybaspotting"
+		}
+		if link != "" {
+			form.Set("url", link)
+			form.Set("url_title", linkTitle)
 		}
 
 		resp, err := n.client.PostForm("https://api.pushover.net/1/messages.json", form)
