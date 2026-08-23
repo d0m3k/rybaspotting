@@ -21,7 +21,8 @@ type AdminCollectionEntry struct {
 
 type LeaderboardEntry struct {
 	UserID   int    `json:"user_id"`
-	Username string `json:"username"`
+	Username string `json:"username"`      // login (used as fallback / unique key)
+	Name     string `json:"name"`           // display name or username — what's shown
 	Count    int    `json:"count"`
 }
 

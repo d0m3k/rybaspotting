@@ -20,10 +20,10 @@ func (h *LeaderboardHandler) Get(w http.ResponseWriter, r *http.Request) {
 
 	// Top spotters
 	rows, err := h.DB.Query(
-		`SELECT u.id, u.username, COUNT(f.id) AS count
+		`SELECT u.id, u.username, COALESCE(NULLIF(u.display_name, ''), u.username), COUNT(f.id) AS count
 		 FROM users u
 		 JOIN fish f ON f.spotted_by = u.id
-		 GROUP BY u.id, u.username
+		 GROUP BY u.id, u.username, COALESCE(NULLIF(u.display_name, ''), u.username)
 		 ORDER BY count DESC
 		 LIMIT 50`,
 	)
@@ -31,7 +31,7 @@ func (h *LeaderboardHandler) Get(w http.ResponseWriter, r *http.Request) {
 		defer rows.Close()
 		for rows.Next() {
 			var e models.LeaderboardEntry
-			if err := rows.Scan(&e.UserID, &e.Username, &e.Count); err == nil {
+			if err := rows.Scan(&e.UserID, &e.Username, &e.Name, &e.Count); err == nil {
 				lb.TopSpotters = append(lb.TopSpotters, e)
 			}
 		}
@@ -39,10 +39,10 @@ func (h *LeaderboardHandler) Get(w http.ResponseWriter, r *http.Request) {
 
 	// Top collectors
 	rows2, err := h.DB.Query(
-		`SELECT u.id, u.username, COUNT(c.id) AS count
+		`SELECT u.id, u.username, COALESCE(NULLIF(u.display_name, ''), u.username), COUNT(c.id) AS count
 		 FROM users u
 		 JOIN collections c ON c.user_id = u.id
-		 GROUP BY u.id, u.username
+		 GROUP BY u.id, u.username, COALESCE(NULLIF(u.display_name, ''), u.username)
 		 ORDER BY count DESC
 		 LIMIT 50`,
 	)
@@ -50,7 +50,7 @@ func (h *LeaderboardHandler) Get(w http.ResponseWriter, r *http.Request) {
 		defer rows2.Close()
 		for rows2.Next() {
 			var e models.LeaderboardEntry
-			if err := rows2.Scan(&e.UserID, &e.Username, &e.Count); err == nil {
+			if err := rows2.Scan(&e.UserID, &e.Username, &e.Name, &e.Count); err == nil {
 				lb.TopCollectors = append(lb.TopCollectors, e)
 			}
 		}
@@ -58,10 +58,10 @@ func (h *LeaderboardHandler) Get(w http.ResponseWriter, r *http.Request) {
 
 	// Top commenters
 	rows3, err := h.DB.Query(
-		`SELECT u.id, u.username, COUNT(cm.id) AS count
+		`SELECT u.id, u.username, COALESCE(NULLIF(u.display_name, ''), u.username), COUNT(cm.id) AS count
 		 FROM users u
 		 JOIN comments cm ON cm.user_id = u.id
-		 GROUP BY u.id, u.username
+		 GROUP BY u.id, u.username, COALESCE(NULLIF(u.display_name, ''), u.username)
 		 ORDER BY count DESC
 		 LIMIT 50`,
 	)
@@ -69,7 +69,7 @@ func (h *LeaderboardHandler) Get(w http.ResponseWriter, r *http.Request) {
 		defer rows3.Close()
 		for rows3.Next() {
 			var e models.LeaderboardEntry
-			if err := rows3.Scan(&e.UserID, &e.Username, &e.Count); err == nil {
+			if err := rows3.Scan(&e.UserID, &e.Username, &e.Name, &e.Count); err == nil {
 				lb.TopCommenters = append(lb.TopCommenters, e)
 			}
 		}

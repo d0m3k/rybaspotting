@@ -42,8 +42,8 @@ export function LeaderboardPage() {
               <tr key={e.username}>
                 <td><span class="rank-medal">{medal(i)}</span> {i + 1}</td>
                 <td style="display:flex;align-items:center;gap:8px;">
-                  <Avatar userId={e.user_id} name={e.username} size={26} />
-                  <strong>{e.username}</strong>
+                  <Avatar userId={e.user_id} name={e.name || e.username} size={26} />
+                  <strong>{e.name || e.username}</strong>
                 </td>
                 <td>{e.count}</td>
               </tr>
@@ -66,8 +66,8 @@ export function LeaderboardPage() {
               <tr key={e.username}>
                 <td><span class="rank-medal">{medal(i)}</span> {i + 1}</td>
                 <td style="display:flex;align-items:center;gap:8px;">
-                  <Avatar userId={e.user_id} name={e.username} size={26} />
-                  <strong>{e.username}</strong>
+                  <Avatar userId={e.user_id} name={e.name || e.username} size={26} />
+                  <strong>{e.name || e.username}</strong>
                 </td>
                 <td>{e.count}</td>
               </tr>
@@ -91,8 +91,8 @@ export function LeaderboardPage() {
               <tr key={e.username}>
                 <td><span class="rank-medal">{medal(i)}</span> {i + 1}</td>
                 <td style="display:flex;align-items:center;gap:8px;">
-                  <Avatar userId={e.user_id} name={e.username} size={26} />
-                  <strong>{e.username}</strong>
+                  <Avatar userId={e.user_id} name={e.name || e.username} size={26} />
+                  <strong>{e.name || e.username}</strong>
                 </td>
                 <td>{e.count}</td>
               </tr>
