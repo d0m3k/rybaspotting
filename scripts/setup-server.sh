@@ -59,10 +59,23 @@ SERVICEEOF
 fi
 
 echo "=== 5. Setting up nginx ==="
+# Log format with real client IP (cloudflared sets CF-Connecting-IP on tunnel
+# traffic; without this everything logs as 127.0.0.1). Used by r2-report.sh.
+if ! grep -q 'log_format ryby_log' /etc/nginx/nginx.conf; then
+    sed -i '/^\taccess_log \/var\/log\/nginx\/access.log;$/a\
+\
+\tmap $http_cf_connecting_ip $ryby_client_ip {\
+\t\tdefault $http_cf_connecting_ip;\
+\t\t\'\'      $remote_addr;\
+\t}\
+\tlog_format ryby_log '\''$ryby_client_ip - [$time_local] "$request" $status $body_bytes_sent "$http_referer" "$http_user_agent"'\'';' /etc/nginx/nginx.conf
+fi
 cat > /etc/nginx/sites-available/rybaspotting << 'NGINXEOF'
 server {
     listen 80;
     server_name ryby.dom3k.pl;
+
+    access_log /var/log/nginx/ryby.access.log ryby_log;
 
     root /opt/rybaspotting/frontend/dist;
     index index.html;
