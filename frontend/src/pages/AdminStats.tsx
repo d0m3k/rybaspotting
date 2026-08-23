@@ -156,6 +156,46 @@ export function AdminStatsPage() {
     }
   }
 
+  async function handleRenameUser(user: UserEntry) {
+    const currentName = user.display_name || user.username;
+    const newName = prompt(`Nowa wyświetlana nazwa dla „${currentName}”:\n(pusta = usuń nazwę, wtedy pokazuje się login)`, currentName);
+    if (newName === null) return;
+
+    const newUsername = prompt(`Nowy login dla „${user.username}”:\n(Enter bez zmian = zostaw obecny login)`, user.username);
+    if (newUsername === null) return;
+
+    const trimmedName = newName.trim();
+    const trimmedUsername = newUsername.trim();
+
+    if (trimmedName === user.display_name && trimmedUsername === user.username) {
+      flash('ℹ️ Nic się nie zmieniło');
+      return;
+    }
+    if (trimmedName.length > 50) {
+      flash('❌ Nazwa może mieć max 50 znaków', true);
+      return;
+    }
+    if (trimmedUsername.length > 50) {
+      flash('❌ Login może mieć max 50 znaków', true);
+      return;
+    }
+
+    setActingUser(user.username);
+    try {
+      const res = await api.renameUser(user.username, trimmedUsername, trimmedName);
+      setUsers(prev => prev.map(u =>
+        u.id === user.id
+          ? { ...u, username: res.username || trimmedUsername, display_name: res.display_name ?? trimmedName }
+          : u
+      ));
+      flash(`✏️ Zmieniono: ${res.display_name || res.username}`);
+    } catch (err: any) {
+      flash(`❌ ${err.message}`, true);
+    } finally {
+      setActingUser(null);
+    }
+  }
+
   async function handleDeleteUser(username: string) {
     if (!confirm(`Usunąć użytkownika „${username}”?\n\nJeśli ma spotted ryby — zostanie zanonimizowany.\nJeśli nie ma żadnych ryb — zostanie usunięty trwale.`)) return;
     setActingUser(username);
@@ -349,6 +389,14 @@ export function AdminStatsPage() {
                         {actingUser === user.username ? '…' : '👑 Promuj'}
                       </button>
                     )}
+                    <button
+                      class="btn btn-sm"
+                      onClick={() => handleRenameUser(user)}
+                      disabled={actingUser === user.username}
+                      style="font-size:12px;padding:5px 12px;background:var(--bg-input);color:var(--text-secondary);border:1px solid var(--border);border-radius:8px;cursor:pointer;"
+                    >
+                      {actingUser === user.username ? '…' : '✏️ Nazwa'}
+                    </button>
                     <button
                       class="btn btn-sm"
                       onClick={() => handleSetPassword(user.username)}

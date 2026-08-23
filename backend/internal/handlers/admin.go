@@ -197,6 +197,12 @@ type setPasswordRequest struct {
 	NewPassword string `json:"new_password"`
 }
 
+type renameUserRequest struct {
+	Username       string `json:"username"`
+	NewUsername    string `json:"new_username"`     // empty/omitted = unchanged
+	NewDisplayName string `json:"new_display_name"` // always applied (empty clears it → username is shown)
+}
+
 // ListUsers returns all users with their spot and collect counts.
 func (h *AdminHandler) ListUsers(w http.ResponseWriter, r *http.Request) {
 	rows, err := h.DB.Query(
@@ -270,6 +276,65 @@ func (h *AdminHandler) SetPassword(w http.ResponseWriter, r *http.Request) {
 	log.Printf("[ADMIN] type=set_password admin_id=%d target=%s", adminID, req.Username)
 
 	writeJSON(w, http.StatusOK, map[string]string{"message": "password updated"})
+}
+
+// RenameUser lets an admin change a user's login username and/or display name.
+// The displayed name everywhere in the app is COALESCE(NULLIF(display_name,''), username),
+// so an empty display_name makes the (possibly new) username the visible name.
+func (h *AdminHandler) RenameUser(w http.ResponseWriter, r *http.Request) {
+	var req renameUserRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, `{"error":"invalid request body"}`, http.StatusBadRequest)
+		return
+	}
+
+	req.Username = strings.TrimSpace(req.Username)
+	req.NewUsername = strings.TrimSpace(req.NewUsername)
+	req.NewDisplayName = strings.TrimSpace(req.NewDisplayName)
+	if req.Username == "" {
+		http.Error(w, `{"error":"username required"}`, http.StatusBadRequest)
+		return
+	}
+	if req.NewUsername != "" && req.NewUsername != req.Username {
+		if len(req.NewUsername) > 50 {
+			http.Error(w, `{"error":"username too long (max 50)"}`, http.StatusBadRequest)
+			return
+		}
+	} else {
+		req.NewUsername = "" // unchanged — don't update
+	}
+	if len(req.NewDisplayName) > 50 {
+		http.Error(w, `{"error":"display name too long (max 50)"}`, http.StatusBadRequest)
+		return
+	}
+
+	newUsername := req.Username
+	if req.NewUsername != "" {
+		newUsername = req.NewUsername
+	}
+
+	_, err := h.DB.Exec(
+		`UPDATE users SET username = $1, display_name = $2 WHERE username = $3 AND deleted_at IS NULL`,
+		newUsername, req.NewDisplayName, req.Username,
+	)
+	if err != nil {
+		if isPGUniqueViolation(err) {
+			http.Error(w, `{"error":"username already taken"}`, http.StatusConflict)
+			return
+		}
+		http.Error(w, `{"error":"internal error"}`, http.StatusInternalServerError)
+		return
+	}
+
+	adminID, _ := r.Context().Value(middleware.ContextUserID).(int)
+	log.Printf("[ADMIN] type=rename_user admin_id=%d old_username=%s new_username=%s new_display_name=%q",
+		adminID, req.Username, newUsername, req.NewDisplayName)
+
+	writeJSON(w, http.StatusOK, map[string]string{
+		"message":       "user renamed",
+		"username":      newUsername,
+		"display_name":  req.NewDisplayName,
+	})
 }
 
 // DeleteUser removes a user. Users with spotted fish are soft-deleted

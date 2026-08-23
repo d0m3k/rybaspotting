@@ -150,6 +150,13 @@ export const api = {
       body: JSON.stringify({ username, new_password: newPassword }),
     }),
 
+  // Admin — rename a user (login username and/or display name)
+  renameUser: (username: string, newUsername: string, newDisplayName: string) =>
+    request<{ message: string; username: string; display_name: string }>('/api/admin/rename-user', {
+      method: 'POST',
+      body: JSON.stringify({ username, new_username: newUsername, new_display_name: newDisplayName }),
+    }),
+
   // Admin — delete / restore users
   deleteUser: (username: string) =>
     request(`/api/admin/delete-user?username=${encodeURIComponent(username)}`, {
