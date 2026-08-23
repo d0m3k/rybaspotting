@@ -119,7 +119,7 @@ fi
 
 # ── 2. R2 operations via Cloudflare GraphQL (optional) ───────────────────────
 
-ops_a=0; ops_b=0; ops_cost_str=""; ops_note=""
+ops_a="?"; ops_b="?"; ops_cost_str=""; ops_note=""
 CF_TOKEN=$(env_val CF_API_TOKEN)
 if [ -n "$CF_TOKEN" ]; then
     ACCOUNT=$(env_val CF_ACCOUNT_ID)
@@ -135,8 +135,8 @@ if [ -n "$CF_TOKEN" ]; then
         FROM=$(date -u -d '24 hours ago' +%Y-%m-%dT%H:%M:%SZ)
         TO=$(date -u +%Y-%m-%dT%H:%M:%SZ)
         QUERY=$(jq -n --arg a "$ACCOUNT" --arg f "$FROM" --arg t "$TO" --arg b "$BUCKET" \
-            '{query: ("query { viewer { accounts(filter: {accountTag: \"" + $a + "\"}) { r2OperationsAdaptiveGroups(limit: 100, filter: {datetime_geq: \"" + $f + "\", datetime_leq: \"" + $t + "\", bucketName: \"" + $b + "\"}) { dimensions { actionType } _sum { requests } } } } }")}')
-        RESP=$(curl -s -X POST https://api.cloudflare.com/client/graphql \
+            '{query: ("query { viewer { accounts(filter: {accountTag: \"" + $a + "\"}) { r2OperationsAdaptiveGroups(limit: 100, filter: {datetime_geq: \"" + $f + "\", datetime_leq: \"" + $t + "\", bucketName: \"" + $b + "\"}) { dimensions { actionType } sum { requests } } } } }")}')
+        RESP=$(curl -s -X POST https://api.cloudflare.com/client/v4/graphql \
             -H "Authorization: Bearer ${CF_TOKEN}" \
             -H "Content-Type: application/json" \
             -d "$QUERY" 2>/dev/null || true)
@@ -146,17 +146,19 @@ if [ -n "$CF_TOKEN" ]; then
             ops_note="(błąd CF API: ${cf_err} — szczegóły w logu)"
             echo "$LOG_PREFIX CF GraphQL error: $(echo "$RESP" | jq -c '.errors' 2>/dev/null)"
         else
+            a_sum=0; b_sum=0
             while IFS=$'\t' read -r action requests; do
                 [ -z "$action" ] && continue
                 case "$action" in
-                    # Class B: cheap reads
-                    GetObject|HeadObject|HeadBucket|ListBuckets|UsageSummary|GetBucketLocation|GetBucketEncryption)
-                        ops_b=$(( ops_b + requests )) ;;
-                    # everything else counts as Class A: writes / listings
+                    # Class B (reads, $0.36/M): Get*/Head*/UsageSummary
+                    GetObject|HeadObject|HeadBucket|UsageSummary|GetBucketLocation|GetBucketEncryption|GetBucketCors|GetBucketLifecycleConfiguration|GetBucketNotificationConfiguration|GetBucketSippyConfiguration|GetBucketTagging)
+                        b_sum=$(( b_sum + requests )) ;;
+                    # Class A (writes/listings, $4.50/M): Put*/List*/Copy*/Upload*/Delete* …
                     *)
-                        ops_a=$(( ops_a + requests )) ;;
+                        a_sum=$(( a_sum + requests )) ;;
                 esac
-            done < <(echo "$RESP" | jq -r '.data.viewer.accounts[0].r2OperationsAdaptiveGroups[]? | [.dimensions.actionType, ._sum.requests] | @tsv' 2>/dev/null)
+            done < <(echo "$RESP" | jq -r '.data.viewer.accounts[0].r2OperationsAdaptiveGroups[]? | [.dimensions.actionType, .sum.requests] | @tsv' 2>/dev/null)
+            ops_a=$a_sum; ops_b=$b_sum
             ops_cost_str=$(awk -v a="$ops_a" -v b="$ops_b" 'BEGIN { printf "~$%.6f/d", (a*4.50 + b*0.36) / 1000000 }')
         fi
     fi
@@ -227,9 +229,9 @@ fi
 # ── thresholds → priority-1 alert ────────────────────────────────────────────
 
 alert_parts=""
-if [ "$ops_b" -gt "$ALERT_B" ]; then alert_parts+="Class B ops ${ops_b} > ${ALERT_B}; "; fi
-if [ "$ops_a" -gt "$ALERT_A" ]; then alert_parts+="Class A ops ${ops_a} > ${ALERT_A}; "; fi
-if [ "$req_total" -gt "$ALERT_REQ" ]; then alert_parts+="origin req ${req_total} > ${ALERT_REQ}; "; fi
+if [ "$ops_b" != "?" ] && [ "$ops_b" -gt "$ALERT_B" ] 2>/dev/null; then alert_parts+="Class B ops ${ops_b} > ${ALERT_B}; "; fi
+if [ "$ops_a" != "?" ] && [ "$ops_a" -gt "$ALERT_A" ] 2>/dev/null; then alert_parts+="Class A ops ${ops_a} > ${ALERT_A}; "; fi
+if [ "$req_total" -gt "$ALERT_REQ" ] 2>/dev/null; then alert_parts+="origin req ${req_total} > ${ALERT_REQ}; "; fi
 
 if [ -n "$alert_parts" ]; then
     push_notify "🚨 Ryby R2 — anomaliczny ruch!" \
