@@ -34,7 +34,6 @@ export function LocationPreview({ lat, lng, onChange, onAddress }: Props) {
 
     const map = L.map(container, {
       zoomControl: false,
-      attributionControl: false,
       dragging: false,
       scrollWheelZoom: false,
       doubleClickZoom: false,

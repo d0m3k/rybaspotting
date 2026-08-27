@@ -1533,9 +1533,20 @@ h3 {
   background: var(--bg-highlight);
 }
 
-/* Hide Leaflet controls inside preview */
-.location-preview-map .leaflet-control-container {
+/* Hide Leaflet zoom/interactive controls inside the preview, but keep the
+   attribution control visible — CARTO/OSM terms require it on every map. */
+.location-preview-map .leaflet-control-container .leaflet-control:not(.leaflet-control-attribution) {
   display: none;
+}
+
+/* Compact attribution for the small preview map so it doesn't dominate it. */
+.location-preview-map .leaflet-control-attribution {
+  font-size: 9px;
+  padding: 0 4px;
+  max-width: 85%;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .location-preview-address {

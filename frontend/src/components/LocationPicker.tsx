@@ -40,7 +40,6 @@ export function LocationPicker({ initialLat, initialLng, onConfirm, onCancel, li
     const c = centerRef.current;
     const map = L.map('location-picker-map', {
       zoomControl: false,
-      attributionControl: false,
     }).setView([c.lat, c.lng], 16);
     mapRef.current = map;
 

@@ -12,19 +12,33 @@ export interface TileLayerOpts {
   maxZoom: number;
 }
 
+// CARTO basemaps now require an API key (https://carto.com/basemaps/apikey/).
+// The key is public by design (it ships in the tile URL) and is scoped per
+// domain by CARTO. Set VITE_CARTO_KEY at build time (locally via frontend/.env,
+// in CI via the VITE_CARTO_KEY GitHub Actions secret — see build.yml).
+const CARTO_KEY = (import.meta.env.VITE_CARTO_KEY as string | undefined)?.trim();
+
+function cartoUrl(style: string): string {
+  const base = `https://{s}.basemaps.cartocdn.com/${style}/{z}/{x}/{y}{r}.png`;
+  return CARTO_KEY ? `${base}?key=${encodeURIComponent(CARTO_KEY)}` : base;
+}
+
+// Attribution required by the CARTO basemaps terms and the ODbL — must stay
+// visible on every map instance (main map, picker, preview).
+const ATTRIBUTION =
+  '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>';
+
 export function mapTiles(dark: boolean): TileLayerOpts {
   if (dark) {
     return {
-      url: 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
-      attribution:
-        '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>',
+      url: cartoUrl('dark_all'),
+      attribution: ATTRIBUTION,
       maxZoom: 20,
     };
   }
   return {
-    url: 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',
-    attribution:
-      '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>',
+    url: cartoUrl('light_all'),
+    attribution: ATTRIBUTION,
     maxZoom: 20,
   };
 }
