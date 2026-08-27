@@ -558,6 +558,14 @@ html.dark .leaflet-control-attribution a {
   color: var(--text-secondary);
 }
 
+/* Main map page: the map fills the viewport, but the fixed bottom nav bar
+   (72px) would cover Leaflet's default bottom-right attribution placement.
+   Lift it clear of the bar — CARTO/OSM terms require the attribution to be
+   visible ("prominent and conspicuous"), not hidden under UI. */
+.map-container .leaflet-control-attribution {
+  margin-bottom: calc(78px + env(safe-area-inset-bottom, 0px));
+}
+
 /* Recenter (my location) button — matches Leaflet zoom control style, and
    sits snugly under the +/− zoom bar (topleft). The .leaflet-control prefix
    gives this selector the same specificity as Leaflet's
