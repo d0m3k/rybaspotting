@@ -89,7 +89,9 @@ server {
     location /api/ {
         proxy_pass http://127.0.0.1:8080;
         proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
+        # Real client IP via the $ryby_client_ip map (nginx.conf http{}):
+        # CF-Connecting-IP from cloudflared, falling back to $remote_addr.
+        proxy_set_header X-Real-IP $ryby_client_ip;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto $scheme;
         client_max_body_size 10M;
