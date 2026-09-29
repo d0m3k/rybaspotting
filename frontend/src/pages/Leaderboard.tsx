@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'preact/hooks';
 import { api } from '../api';
 import { Avatar } from '../components/Avatar';
+import { UserLink } from '../components/UserLink';
 
 export function LeaderboardPage() {
   const [data, setData] = useState<{ top_spotters: any[]; top_collectors: any[]; top_commenters: any[] } | null>(null);
@@ -43,7 +44,7 @@ export function LeaderboardPage() {
                 <td><span class="rank-medal">{medal(i)}</span> {i + 1}</td>
                 <td style="display:flex;align-items:center;gap:8px;">
                   <Avatar userId={e.user_id} name={e.name || e.username} size={26} />
-                  <strong>{e.name || e.username}</strong>
+                  <strong><UserLink userId={e.user_id} name={e.name || e.username} /></strong>
                 </td>
                 <td>{e.count}</td>
               </tr>
@@ -67,7 +68,7 @@ export function LeaderboardPage() {
                 <td><span class="rank-medal">{medal(i)}</span> {i + 1}</td>
                 <td style="display:flex;align-items:center;gap:8px;">
                   <Avatar userId={e.user_id} name={e.name || e.username} size={26} />
-                  <strong>{e.name || e.username}</strong>
+                  <strong><UserLink userId={e.user_id} name={e.name || e.username} /></strong>
                 </td>
                 <td>{e.count}</td>
               </tr>
@@ -92,7 +93,7 @@ export function LeaderboardPage() {
                 <td><span class="rank-medal">{medal(i)}</span> {i + 1}</td>
                 <td style="display:flex;align-items:center;gap:8px;">
                   <Avatar userId={e.user_id} name={e.name || e.username} size={26} />
-                  <strong>{e.name || e.username}</strong>
+                  <strong><UserLink userId={e.user_id} name={e.name || e.username} /></strong>
                 </td>
                 <td>{e.count}</td>
               </tr>

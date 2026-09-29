@@ -186,7 +186,7 @@ func (h *CommentHandler) Recent(w http.ResponseWriter, r *http.Request) {
 		        COALESCE(NULLIF(cu.display_name, ''), cu.username),
 		        c.body, c.created_at,
 		        f.photo_filename, f.latitude, f.longitude, f.address_hint,
-		        COALESCE(NULLIF(su.display_name, ''), su.username)
+		        f.spotted_by, COALESCE(NULLIF(su.display_name, ''), su.username)
 		 FROM comments c
 		 JOIN users cu ON cu.id = c.user_id
 		 JOIN fish f  ON f.id = c.fish_id
@@ -204,7 +204,7 @@ func (h *CommentHandler) Recent(w http.ResponseWriter, r *http.Request) {
 		var wc models.WallComment
 		if err := rows.Scan(
 			&wc.ID, &wc.FishID, &wc.UserID, &wc.Username, &wc.Body, &wc.CreatedAt,
-			&wc.PhotoFilename, &wc.Latitude, &wc.Longitude, &wc.AddressHint, &wc.SpotterName,
+			&wc.PhotoFilename, &wc.Latitude, &wc.Longitude, &wc.AddressHint, &wc.SpotterID, &wc.SpotterName,
 		); err != nil {
 			continue
 		}

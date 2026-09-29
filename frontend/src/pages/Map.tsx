@@ -6,6 +6,8 @@ import { distanceMeters } from '../distance';
 import { loadAuth, goToLogin } from '../stores/auth';
 import { mapTiles } from '../mapStyle';
 import { navigate, fishUrl } from '../router';
+import { UserLink } from '../components/UserLink';
+import { FishAdminActions } from '../components/FishAdminActions';
 
 // Fix Leaflet default icon issue
 delete (L.Icon.Default.prototype as any)._getIconUrl;
@@ -282,7 +284,7 @@ function makeClusterIcon(cl: FishCluster): L.DivIcon {
 
 const CLUSTER_PAGE_SIZE = 5;
 
-export function MapPage({ onStatsChanged, userId, username, dark, focusFishId }: { onStatsChanged?: () => void; userId?: number; username?: string; dark?: boolean; focusFishId?: number }) {
+export function MapPage({ onStatsChanged, userId, username, dark, focusFishId, isAdmin }: { onStatsChanged?: () => void; userId?: number; username?: string; dark?: boolean; focusFishId?: number; isAdmin?: boolean }) {
   const mapRef = useRef<L.Map | null>(null);
   const tileRef = useRef<L.TileLayer | null>(null);
   const markersRef = useRef<L.Layer[]>([]);
@@ -558,7 +560,7 @@ export function MapPage({ onStatsChanged, userId, username, dark, focusFishId }:
         if (alreadyThere) return prev;
         return {
           ...prev,
-          collectors: [...(prev.collectors || []), { username: username, collected_at: new Date().toISOString() }],
+          collectors: [...(prev.collectors || []), { user_id: userId, username: username, collected_at: new Date().toISOString() }],
         };
       });
     } catch (err: any) {
@@ -834,7 +836,7 @@ export function MapPage({ onStatsChanged, userId, username, dark, focusFishId }:
             onClick={() => setFullPhoto(selectedFish.photo_url || `/api/photos/${selectedFish.photo_filename}`)}
             title="Kliknij, aby zobaczyć całość"
           />
-          <p class="fish-spotter">🐟 Spotter: {selectedFish.spotter_name}</p>
+          <p class="fish-spotter">🐟 Spotter: <UserLink userId={selectedFish.spotted_by} name={selectedFish.spotter_name || '?'} /></p>
           <p class="fish-date">
             📅 {new Date(selectedFish.created_at).toLocaleDateString('pl-PL', { year: 'numeric', month: 'long', day: 'numeric' })}
           </p>
@@ -850,7 +852,9 @@ export function MapPage({ onStatsChanged, userId, username, dark, focusFishId }:
               'Ładowanie…'
             ) : fishDetail?.collectors?.length > 0 ? (
               <>
-                🎣 Zebrana {fishDetail.collectors.length}× — {fishDetail.collectors.map((c: any) => c.username).join(', ')}
+                🎣 Zebrana {fishDetail.collectors.length}× — {fishDetail.collectors.map((c: any, i: number) => (
+                  <span key={i}>{i > 0 && ', '}<UserLink userId={c.user_id} name={c.username} /></span>
+                ))}
                 <br /><span class="fish-last-collected">
                   Ostatnio: {new Date(fishDetail.collectors[fishDetail.collectors.length - 1].collected_at).toLocaleDateString('pl-PL', { day: 'numeric', month: 'short', year: 'numeric' })}
                 </span>
@@ -882,7 +886,7 @@ export function MapPage({ onStatsChanged, userId, username, dark, focusFishId }:
                 return (
                   <div class="fish-comment" key={c.id}>
                     <div class="fish-comment-head">
-                      <span class="fish-comment-author">{c.username}</span>
+                      <UserLink userId={c.user_id} name={c.username} class="fish-comment-author" />
                       <span class="fish-comment-time">
                         {new Date(c.created_at).toLocaleDateString('pl-PL', { day: 'numeric', month: 'short', year: 'numeric' })}
                       </span>
@@ -952,6 +956,27 @@ export function MapPage({ onStatsChanged, userId, username, dark, focusFishId }:
               </button>
             )}
           </div>
+
+          {isAdmin && (
+            <div class="fish-admin-panel">
+              <FishAdminActions
+                fish={selectedFish}
+                onMessage={(m, isErr) => { if (isErr) alert(m); }}
+                onDeleted={(id) => {
+                  setFishList(prev => prev.filter(f => f.id !== id));
+                  closeFishSheet();
+                }}
+                onMerged={(sourceId) => {
+                  setFishList(prev => prev.filter(f => f.id !== sourceId));
+                  closeFishSheet();
+                }}
+                onLocationUpdated={(id, lat, lng, address) => {
+                  setFishList(prev => prev.map(f => f.id === id ? { ...f, latitude: lat, longitude: lng, address_hint: address } : f));
+                  setSelectedFish((prev: any) => prev ? { ...prev, latitude: lat, longitude: lng, address_hint: address } : prev);
+                }}
+              />
+            </div>
+          )}
         </div>
         );
       })()}

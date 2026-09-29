@@ -10,13 +10,15 @@ type Collection struct {
 }
 
 type AdminCollectionEntry struct {
-	ID           int       `json:"id"`
-	FishID       int       `json:"fish_id"`
-	CollectorName string   `json:"collector_name"`
-	SpotterName  string    `json:"spotter_name"`
-	Latitude     float64   `json:"latitude"`
-	Longitude    float64   `json:"longitude"`
-	CreatedAt    time.Time `json:"created_at"`
+	ID            int       `json:"id"`
+	FishID        int       `json:"fish_id"`
+	CollectorID   int       `json:"collector_id"`
+	CollectorName string    `json:"collector_name"`
+	SpotterID     int       `json:"spotter_id"`
+	SpotterName   string    `json:"spotter_name"`
+	Latitude      float64   `json:"latitude"`
+	Longitude     float64   `json:"longitude"`
+	CreatedAt     time.Time `json:"created_at"`
 }
 
 type LeaderboardEntry struct {

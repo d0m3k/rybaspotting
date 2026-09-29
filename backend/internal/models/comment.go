@@ -21,5 +21,6 @@ type WallComment struct {
 	Latitude      float64 `json:"latitude"`
 	Longitude     float64 `json:"longitude"`
 	AddressHint   string  `json:"address_hint"`
+	SpotterID     int     `json:"spotter_id"`
 	SpotterName   string  `json:"spotter_name"`
 }

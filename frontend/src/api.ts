@@ -110,6 +110,10 @@ export const api = {
   getMyCollections: () =>
     request<any[]>('/api/users/me/collections'),
 
+  // Public user profile (spotted/collected fish + comments)
+  getUser: (id: number) =>
+    request<any>(`/api/users/${id}`),
+
   uploadAvatar: (formData: FormData) =>
     request('/api/users/me/avatar', {
       method: 'POST',

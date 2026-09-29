@@ -2281,3 +2281,30 @@ h3 {
   color: var(--text-muted);
   margin: -4px 0 8px;
 }
+
+/* Clickable username → public profile */
+.user-link {
+  color: inherit;
+  cursor: pointer;
+  text-decoration: none;
+  font-weight: inherit;
+  border-bottom: 1px dotted currentColor;
+}
+.user-link:hover { color: #FF6B6B; }
+
+/* Admin action row inside the map's fish sheet */
+.fish-admin-panel {
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px dashed var(--border);
+}
+.fish-admin-panel::before {
+  content: '🔑 Admin';
+  display: block;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  margin-bottom: 6px;
+}

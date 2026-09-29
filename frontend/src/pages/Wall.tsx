@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'preact/hooks';
 import { api } from '../api';
 import { navigate } from '../router';
+import { UserLink } from '../components/UserLink';
 
 interface Props {
   myUserId?: number;
@@ -116,8 +117,8 @@ export function WallPage({ myUserId, isAdmin }: Props) {
               </div>
               <div class="wall-body">
                 <div class="wall-meta">
-                  <span class="wall-author">{c.username}</span>
-                  <span class="wall-fish" onClick={() => handleGoToFish(c.fish_id)} title="Pokaż na mapie">↳ ryba #{c.fish_id} ({c.spotter_name})</span>
+                  <UserLink userId={c.user_id ?? c.UserID} name={c.username} class="wall-author" />
+                  <span class="wall-fish" onClick={() => handleGoToFish(c.fish_id)} title="Pokaż na mapie">↳ ryba #{c.fish_id} (<UserLink userId={c.spotter_id} name={c.spotter_name} />)</span>
                   <span class="wall-time">{timeAgo(c.created_at)}</span>
                 </div>
                 <p class="wall-text">{previewText(c.body)}</p>

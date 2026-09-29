@@ -9,6 +9,7 @@ import { UploadPage } from './pages/Upload';
 import { LeaderboardPage } from './pages/Leaderboard';
 import { WallPage } from './pages/Wall';
 import { ProfilePage } from './pages/Profile';
+import { UserProfilePage } from './pages/UserProfile';
 import { AdminStatsPage } from './pages/AdminStats';
 import { PrivacyPolicyPage } from './pages/PrivacyPolicy';
 import { NavBar } from './components/NavBar';
@@ -42,7 +43,7 @@ export function App() {
   // Deep links like `#/fish/{id}` stay in `route` so a fresh login drops you
   // straight on the shared fish.
   const authed = !!auth;
-  const GUEST_VIEW = new Set<Page>(['map', 'wall', 'leaderboard', 'login', 'register', 'privacy']);
+  const GUEST_VIEW = new Set<Page>(['map', 'wall', 'leaderboard', 'user', 'login', 'register', 'privacy']);
   let page: Page = route.page;
   const focusFishId = route.fishId;
   if (!authed) {
@@ -179,6 +180,9 @@ export function App() {
           {page === 'map' && <MapPage dark={dark} focusFishId={focusFishId} />}
           {page === 'wall' && <WallPage />}
           {page === 'leaderboard' && <LeaderboardPage />}
+          {page === 'user' && route.userId != null && (
+            <UserProfilePage userId={route.userId} onBack={() => navigate({ page: 'map' })} />
+          )}
         </div>
 
         <NavBar current={page} onNavigate={navigatePage} allowUpload={false} isAdmin={false} guest />
@@ -220,13 +224,16 @@ export function App() {
       )}
 
       <div class="app-content">
-        {page === 'map' && <MapPage onStatsChanged={refreshStats} userId={auth.userId} username={auth.username} dark={dark} focusFishId={focusFishId} />}
+        {page === 'map' && <MapPage onStatsChanged={refreshStats} userId={auth.userId} username={auth.username} dark={dark} focusFishId={focusFishId} isAdmin={auth.isAdmin} />}
         {page === 'spot' && <SpotPage onHideNav={setHideNav} onStatsChanged={refreshStats} />}
         {page === 'upload' && allowUpload && <UploadPage onStatsChanged={refreshStats} />}
         {page === 'leaderboard' && <LeaderboardPage />}
         {page === 'wall' && <WallPage myUserId={auth.userId} isAdmin={auth.isAdmin} />}
         {page === 'profile' && <ProfilePage auth={auth} onLogout={handleLogout} onOpenPrivacy={() => navigate({ page: 'privacy' })} />}
         {page === 'admin' && <AdminStatsPage />}
+        {page === 'user' && route.userId != null && (
+          <UserProfilePage userId={route.userId} isMe={route.userId === auth.userId} onBack={() => navigate({ page: 'map' })} />
+        )}
         {page === 'privacy' && <PrivacyPolicyPage onBack={() => navigate({ page: 'map' })} />}
       </div>
       {!hideNav && page !== 'privacy' && <NavBar current={page} onNavigate={navigatePage} allowUpload={allowUpload} isAdmin={auth?.isAdmin ?? false} />}

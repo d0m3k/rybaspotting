@@ -20,7 +20,8 @@ type FishDetail struct {
 }
 
 type CollectorEntry struct {
-	Username  string    `json:"username"`
+	UserID      int       `json:"user_id"`
+	Username    string    `json:"username"`
 	CollectedAt time.Time `json:"collected_at"`
 }
 

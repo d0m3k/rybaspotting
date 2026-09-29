@@ -460,7 +460,7 @@ func (h *AdminHandler) Stats(w http.ResponseWriter, r *http.Request) {
 // ListCollections returns all collections for admin review.
 func (h *AdminHandler) ListCollections(w http.ResponseWriter, r *http.Request) {
 	rows, err := h.DB.Query(
-		`SELECT c.id, c.fish_id, COALESCE(NULLIF(cu.display_name, ''), cu.username), COALESCE(NULLIF(su.display_name, ''), su.username), f.latitude, f.longitude, c.created_at
+		`SELECT c.id, c.fish_id, cu.id, COALESCE(NULLIF(cu.display_name, ''), cu.username), su.id, COALESCE(NULLIF(su.display_name, ''), su.username), f.latitude, f.longitude, c.created_at
 		 FROM collections c
 		 JOIN fish f ON f.id = c.fish_id
 		 JOIN users cu ON cu.id = c.user_id
@@ -477,7 +477,7 @@ func (h *AdminHandler) ListCollections(w http.ResponseWriter, r *http.Request) {
 	result := []models.AdminCollectionEntry{}
 	for rows.Next() {
 		var e models.AdminCollectionEntry
-		if err := rows.Scan(&e.ID, &e.FishID, &e.CollectorName, &e.SpotterName,
+		if err := rows.Scan(&e.ID, &e.FishID, &e.CollectorID, &e.CollectorName, &e.SpotterID, &e.SpotterName,
 			&e.Latitude, &e.Longitude, &e.CreatedAt); err != nil {
 			continue
 		}

@@ -276,7 +276,7 @@ func (h *FishHandler) Get(w http.ResponseWriter, r *http.Request) {
 
 	// Get collectors
 	rows, err := h.DB.Query(
-		`SELECT COALESCE(NULLIF(u.display_name, ''), u.username), c.created_at FROM collections c
+		`SELECT c.user_id, COALESCE(NULLIF(u.display_name, ''), u.username), c.created_at FROM collections c
 		 JOIN users u ON u.id = c.user_id
 		 WHERE c.fish_id = $1
 		 ORDER BY c.created_at ASC`, id,
@@ -286,7 +286,7 @@ func (h *FishHandler) Get(w http.ResponseWriter, r *http.Request) {
 		defer rows.Close()
 		for rows.Next() {
 			var ce models.CollectorEntry
-			if err := rows.Scan(&ce.Username, &ce.CollectedAt); err == nil {
+			if err := rows.Scan(&ce.UserID, &ce.Username, &ce.CollectedAt); err == nil {
 				collectors = append(collectors, ce)
 			}
 		}

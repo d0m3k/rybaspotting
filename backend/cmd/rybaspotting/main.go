@@ -123,6 +123,9 @@ func main() {
 		// Avatar serving (public, by user ID)
 		r.Get("/users/avatar/{userID}", userH.ServeAvatar)
 
+		// Public user profile (spotted/collected fish + comments)
+		r.Get("/users/{id}", userH.GetPublicProfile)
+
 		// Auth-protected endpoints
 		r.Group(func(r chi.Router) {
 			r.Use(middleware.AuthMiddleware(cfg))

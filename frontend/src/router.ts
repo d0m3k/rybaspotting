@@ -7,16 +7,18 @@
 //   #/spot | #/upload | #/leaderboard
 //   #/wall | #/profile | #/admin            — app screens
 //   #/fish/{id}                             — map focused on one fish
+//   #/user/{id}                             — public user profile
 //
 // Using the hash (instead of history.pushState) means shared fish links work
 // straight from a static PWA without nginx rewrites, and deep links survive
 // service-worker navigation.
 
-export type Page = 'login' | 'register' | 'map' | 'spot' | 'upload' | 'leaderboard' | 'wall' | 'profile' | 'admin' | 'privacy';
+export type Page = 'login' | 'register' | 'map' | 'spot' | 'upload' | 'leaderboard' | 'wall' | 'profile' | 'admin' | 'privacy' | 'user';
 
 export interface Route {
   page: Page;
   fishId?: number;
+  userId?: number;
 }
 
 const PAGE_PATH: Record<Page, string> = {
@@ -30,6 +32,7 @@ const PAGE_PATH: Record<Page, string> = {
   profile: '/profile',
   admin: '/admin',
   privacy: '/privacy',
+  user: '/user',
 };
 
 /** Parse the current location.hash into a route. Unknown/empty → map. */
@@ -51,6 +54,11 @@ export function parseHash(): Route {
       if (!Number.isInteger(id) || id <= 0) return { page: 'map' };
       return { page: 'map', fishId: id };
     }
+    case 'user': {
+      const id = Number(second);
+      if (!Number.isInteger(id) || id <= 0) return { page: 'map' };
+      return { page: 'user', userId: id };
+    }
     default:
       return { page: 'map' };
   }
@@ -58,6 +66,7 @@ export function parseHash(): Route {
 
 export function hashFor(r: Route): string {
   if (r.page === 'map' && r.fishId != null) return `#/fish/${r.fishId}`;
+  if (r.page === 'user' && r.userId != null) return `#/user/${r.userId}`;
   return `#${PAGE_PATH[r.page]}`;
 }
 
@@ -70,6 +79,11 @@ export function navigate(route: Route): void {
 /** Fully-qualified, shareable URL for a fish. */
 export function fishUrl(id: number): string {
   return `${location.origin}${location.pathname}#/fish/${id}`;
+}
+
+/** Fully-qualified, shareable URL for a user profile. */
+export function userUrl(id: number): string {
+  return `${location.origin}${location.pathname}#/user/${id}`;
 }
 
 /** Subscribe to hash changes. Returns an unsubscribe function. */

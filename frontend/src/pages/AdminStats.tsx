@@ -1,20 +1,9 @@
 import { useState, useEffect } from 'preact/hooks';
 import { api } from '../api';
 import { Avatar } from '../components/Avatar';
-import { LocationPicker } from '../components/LocationPicker';
-
-interface MergeCandidate {
-  id: number;
-  photo_filename: string;
-  photo_url?: string;
-  latitude: number;
-  longitude: number;
-  address_hint: string;
-  spotted_by: number;
-  spotter_name: string;
-  created_at: string;
-  distance_meters: number;
-}
+import { UserLink } from '../components/UserLink';
+import { FishAdminActions } from '../components/FishAdminActions';
+import { navigate } from '../router';
 
 interface UserEntry {
   id: number;
@@ -30,6 +19,7 @@ interface UserEntry {
 interface FishEntry {
   id: number;
   photo_filename: string;
+  photo_url?: string;
   latitude: number;
   longitude: number;
   address_hint: string;
@@ -41,7 +31,9 @@ interface FishEntry {
 interface CollectionEntry {
   id: number;
   fish_id: number;
+  collector_id: number;
   collector_name: string;
+  spotter_id: number;
   spotter_name: string;
   latitude: number;
   longitude: number;
@@ -70,18 +62,7 @@ export function AdminStatsPage() {
   const [actingUser, setActingUser] = useState<string | null>(null);
 
   // Delete state
-  const [deletingFish, setDeletingFish] = useState<number | null>(null);
   const [deletingColl, setDeletingColl] = useState<number | null>(null);
-
-  // Location editing state
-  const [editingFish, setEditingFish] = useState<FishEntry | null>(null);
-  const [savingLocation, setSavingLocation] = useState(false);
-
-  // Merge state
-  const [mergeSource, setMergeSource] = useState<number | null>(null);
-  const [mergeCandidates, setMergeCandidates] = useState<MergeCandidate[]>([]);
-  const [loadingCandidates, setLoadingCandidates] = useState(false);
-  const [merging, setMerging] = useState(false);
 
   useEffect(() => { loadData(); }, []);
 
@@ -220,78 +201,6 @@ export function AdminStatsPage() {
     }
   }
 
-  async function handleDeleteFish(fishId: number) {
-    if (!confirm(`Usunąć rybę #${fishId}?`)) return;
-    setDeletingFish(fishId);
-    try {
-      await api.deleteFish(fishId);
-      setFishList(prev => prev.filter(f => f.id !== fishId));
-      if (stats) setStats({ ...stats, fish_count: stats.fish_count - 1 });
-    } catch (err: any) { alert(err.message); }
-    finally { setDeletingFish(null); }
-  }
-
-  // ── Location editing (via map picker) ──
-  async function handleSaveLocation(newLat: number, newLng: number, address: string) {
-    if (!editingFish) return;
-    setSavingLocation(true);
-    try {
-      await api.updateFishLocation(editingFish.id, {
-        latitude: newLat,
-        longitude: newLng,
-        address_hint: address || editingFish.address_hint,
-      });
-      setFishList(prev => prev.map(f =>
-        f.id === editingFish.id ? { ...f, latitude: newLat, longitude: newLng, address_hint: address || editingFish.address_hint } : f
-      ));
-      flash(`✅ Lokalizacja ryby #${editingFish.id} zaktualizowana`);
-    } catch (err: any) {
-      flash(`❌ ${err.message}`, true);
-    } finally {
-      setSavingLocation(false);
-      setEditingFish(null);
-    }
-  }
-
-  // ── Merge ──
-  async function openMerge(fishId: number) {
-    setMergeSource(fishId);
-    setMergeCandidates([]);
-    setLoadingCandidates(true);
-    try {
-      const cands = await api.mergeCandidates(fishId);
-      setMergeCandidates(cands);
-    } catch (err: any) {
-      flash(`❌ ${err.message}`, true);
-      setMergeSource(null);
-    } finally {
-      setLoadingCandidates(false);
-    }
-  }
-
-  function closeMerge() {
-    setMergeSource(null);
-    setMergeCandidates([]);
-  }
-
-  async function handleMerge(targetId: number) {
-    if (!mergeSource) return;
-    if (!confirm(`Połączyć rybę #${mergeSource} → #${targetId}?\n\nWszystkie zebrania z #${mergeSource} zostaną przeniesione do #${targetId}.\nRyba #${mergeSource} zostanie usunięta.`)) return;
-    setMerging(true);
-    try {
-      const res: any = await api.mergeFish(mergeSource, targetId);
-      flash(`🔀 ${res.message} (${res.collections_moved} zebrań przeniesionych)`);
-      // Remove source from list
-      setFishList(prev => prev.filter(f => f.id !== mergeSource));
-      if (stats) setStats({ ...stats, fish_count: stats.fish_count - 1 });
-      closeMerge();
-    } catch (err: any) {
-      flash(`❌ ${err.message}`, true);
-    } finally {
-      setMerging(false);
-    }
-  }
-
   async function handleDeleteCollection(id: number) {
     if (!confirm(`Usunąć zebranie #${id}?`)) return;
     setDeletingColl(id);
@@ -356,7 +265,9 @@ export function AdminStatsPage() {
                 <div style="min-width:0;">
                   <div style="display:flex;align-items:center;gap:8px;">
                     <Avatar userId={user.id} name={user.display_name || user.username} size={32} />
-                    <strong style={`font-size:15px;${isDeleted ? 'text-decoration:line-through;' : ''}`}>{user.display_name || user.username}</strong>
+                    <strong style={`font-size:15px;${isDeleted ? 'text-decoration:line-through;' : ''}`}>
+                      <UserLink userId={user.id} name={user.display_name || user.username} />
+                    </strong>
                     {user.is_admin && <span style="background:#FF6B6B;color:#fff;font-size:10px;padding:1px 6px;border-radius:4px;font-weight:600;">ADMIN</span>}
                     {isDeleted && <span style="background:#E74C3C;color:#fff;font-size:10px;padding:1px 6px;border-radius:4px;font-weight:600;">🚫 USUNIĘTY</span>}
                   </div>
@@ -435,16 +346,6 @@ export function AdminStatsPage() {
       {/* ── Fish tab ── */}
       {tab === 'fish' && (
         <div style="margin-top:16px;display:flex;flex-direction:column;gap:12px;">
-          {/* Map picker overlay for location editing */}
-          {editingFish && (
-            <LocationPicker
-              initialLat={editingFish.latitude}
-              initialLng={editingFish.longitude}
-              onConfirm={(newLat, newLng, address) => handleSaveLocation(newLat, newLng, address)}
-              onCancel={() => setEditingFish(null)}
-            />
-          )}
-
           {fishList.map(fish => (
             <div key={fish.id} style="background:var(--bg-card);border-radius:14px;border:1px solid var(--border);overflow:hidden;">
               <div style="width:100%;aspect-ratio:4/3;background:var(--bg-highlight);overflow:hidden;">
@@ -454,8 +355,12 @@ export function AdminStatsPage() {
               </div>
               <div style="padding:12px;">
                 <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px;">
-                  <strong>#{fish.id}</strong>
-                  <span style="color:#E67E22;font-size:13px;">{fish.spotter_name}</span>
+                  <strong
+                    style="cursor:pointer;color:#FF6B6B;"
+                    onClick={() => navigate({ page: 'map', fishId: fish.id })}
+                    title="Pokaż na mapie"
+                  >#{fish.id} 🗺️</strong>
+                  <UserLink userId={fish.spotted_by} name={fish.spotter_name} style="color:#E67E22;font-size:13px;" />
                   <span style="font-size:11px;color:var(--text-muted);">{new Date(fish.created_at).toLocaleDateString('pl-PL')}</span>
                 </div>
 
@@ -464,81 +369,24 @@ export function AdminStatsPage() {
                   <div style="margin-top:2px;">{fish.latitude.toFixed(5)}, {fish.longitude.toFixed(5)}</div>
                 </div>
 
-                <div style="display:flex;gap:6px;margin-top:10px;flex-wrap:wrap;">
-                  <button
-                    onClick={() => setEditingFish(fish)}
-                    style="font-size:12px;padding:5px 12px;background:var(--bg-input);color:var(--text-secondary);border:1px solid var(--border);border-radius:8px;cursor:pointer;"
-                  >
-                    📍 Edytuj lokalizację
-                  </button>
-                  <button
-                    onClick={() => openMerge(fish.id)}
-                    style="font-size:12px;padding:5px 12px;background:linear-gradient(135deg,#9B59B6,#8E44AD);color:#fff;border:none;border-radius:8px;cursor:pointer;"
-                  >
-                    🔀 Połącz
-                  </button>
-                  <button
-                    onClick={() => handleDeleteFish(fish.id)}
-                    disabled={deletingFish === fish.id}
-                    style="font-size:12px;padding:5px 12px;background:#E74C3C;color:#fff;border:none;border-radius:8px;cursor:pointer;"
-                  >
-                    {deletingFish === fish.id ? '…' : '🗑 Usuń'}
-                  </button>
-                </div>
+                <FishAdminActions
+                  fish={fish}
+                  onMessage={(m, e) => flash(m, e)}
+                  onDeleted={(id) => {
+                    setFishList(prev => prev.filter(f => f.id !== id));
+                    if (stats) setStats({ ...stats, fish_count: stats.fish_count - 1 });
+                  }}
+                  onMerged={(sourceId) => {
+                    setFishList(prev => prev.filter(f => f.id !== sourceId));
+                    if (stats) setStats({ ...stats, fish_count: stats.fish_count - 1 });
+                  }}
+                  onLocationUpdated={(id, lat, lng, address) => {
+                    setFishList(prev => prev.map(f => f.id === id ? { ...f, latitude: lat, longitude: lng, address_hint: address } : f));
+                  }}
+                />
               </div>
             </div>
           ))}
-
-          {/* ── Merge modal ── */}
-          {mergeSource !== null && (
-            <div style="position:fixed;inset:0;z-index:1000;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,0.6);" onClick={closeMerge}>
-              <div style="background:var(--bg-card);border-radius:16px;padding:20px;max-width:500px;width:calc(100% - 32px);max-height:80vh;overflow-y:auto;" onClick={(e: any) => e.stopPropagation()}>
-                <h3 style="margin:0 0 4px;">🔀 Połącz rybę #{mergeSource}</h3>
-                <p style="font-size:13px;color:var(--text-muted);margin:0 0 16px;">Wybierz rybę, z którą chcesz połączyć — posortowane wg odległości.</p>
-
-                {loadingCandidates ? (
-                  <p style="text-align:center;color:var(--text-muted);">Ładowanie kandydatów…</p>
-                ) : mergeCandidates.length === 0 ? (
-                  <p style="text-align:center;color:var(--text-muted);">Brak innych ryb do połączenia.</p>
-                ) : (
-                  <div style="display:flex;flex-direction:column;gap:8px;">
-                    {mergeCandidates.map(c => (
-                      <div key={c.id} style="display:flex;align-items:center;gap:10px;padding:10px;background:var(--bg-highlight);border-radius:10px;border:1px solid var(--border);">
-                        <div style="width:48px;height:48px;border-radius:8px;overflow:hidden;flex-shrink:0;background:var(--bg-input);">
-                          {c.photo_filename ? (
-                            <img src={c.photo_url || `/api/photos/${c.photo_filename}`} alt={`#${c.id}`} style="width:100%;height:100%;object-fit:cover;" />
-                          ) : <div style="display:flex;align-items:center;justify-content:center;height:100%;font-size:18px;">🐟</div>}
-                        </div>
-                        <div style="flex:1;min-width:0;">
-                          <div style="font-weight:600;font-size:14px;">#{c.id} <span style="color:#E67E22;font-weight:400;">{c.spotter_name}</span></div>
-                          <div style="font-size:11px;color:var(--text-muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">
-                            {c.address_hint && <>📍 {c.address_hint} · </>}
-                            {c.distance_meters < 1000
-                              ? `${c.distance_meters.toFixed(0)} m`
-                              : `${(c.distance_meters / 1000).toFixed(1)} km`}
-                          </div>
-                        </div>
-                        <button
-                          onClick={() => handleMerge(c.id)}
-                          disabled={merging}
-                          style="flex-shrink:0;padding:6px 14px;font-size:12px;background:linear-gradient(135deg,#9B59B6,#8E44AD);color:#fff;border:none;border-radius:8px;cursor:pointer;font-weight:600;"
-                        >
-                          {merging ? '…' : 'Połącz →'}
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                )}
-
-                <button
-                  onClick={closeMerge}
-                  style="margin-top:16px;width:100%;padding:8px;font-size:13px;background:var(--bg-input);color:var(--text-secondary);border:1px solid var(--border);border-radius:8px;cursor:pointer;"
-                >
-                  Zamknij
-                </button>
-              </div>
-            </div>
-          )}
         </div>
       )}
 
@@ -549,13 +397,19 @@ export function AdminStatsPage() {
             <p style="text-align:center;color:var(--text-muted);padding:24px;">Brak zebrań.</p>
           ) : (
             <table class="leaderboard-table" style="width:100%;">
-              <thead><tr><th>ID</th><th>Zbieracz</th><th>Spotter</th><th>Data</th><th></th></tr></thead>
+              <thead><tr><th>Ryba</th><th>Zbieracz</th><th>Spotter</th><th>Data</th><th></th></tr></thead>
               <tbody>
                 {collections.map(c => (
                   <tr key={c.id}>
-                    <td style="font-size:12px;color:var(--text-muted);">#{c.id}</td>
-                    <td><strong>{c.collector_name}</strong></td>
-                    <td style="font-size:12px;">{c.spotter_name}</td>
+                    <td>
+                      <span
+                        style="font-size:12px;color:#FF6B6B;cursor:pointer;"
+                        onClick={() => navigate({ page: 'map', fishId: c.fish_id })}
+                        title={`Zebranie #${c.id} — pokaż rybę na mapie`}
+                      >#{c.fish_id} 🗺️</span>
+                    </td>
+                    <td><strong><UserLink userId={c.collector_id} name={c.collector_name} /></strong></td>
+                    <td style="font-size:12px;"><UserLink userId={c.spotter_id} name={c.spotter_name} /></td>
                     <td style="font-size:12px;color:var(--text-muted);">{new Date(c.created_at).toLocaleDateString('pl-PL')}</td>
                     <td>
                       <button onClick={() => handleDeleteCollection(c.id)} disabled={deletingColl === c.id}

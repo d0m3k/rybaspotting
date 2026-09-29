@@ -12,6 +12,7 @@ import (
 
 	"rybaspotting/internal/config"
 	"rybaspotting/internal/middleware"
+	"rybaspotting/internal/models"
 	"rybaspotting/internal/storage"
 
 	"github.com/disintegration/imaging"
@@ -118,6 +119,138 @@ func (h *UserHandler) MyCollections(w http.ResponseWriter, r *http.Request) {
 	}
 
 	writeJSON(w, http.StatusOK, result)
+}
+
+type userCommentResponse struct {
+	ID            int       `json:"id"`
+	FishID        int       `json:"fish_id"`
+	Body          string    `json:"body"`
+	CreatedAt     time.Time `json:"created_at"`
+	AddressHint   string    `json:"address_hint"`
+	PhotoFilename string    `json:"photo_filename"`
+	PhotoURL      string    `json:"photo_url,omitempty"`
+}
+
+// publicProfileResponse is the public view of a user: their stats plus the
+// fish they spotted, the fish they collected, and their recent comments.
+// Served to anyone (guests included) — no private data (e.g. avatar keys).
+type publicProfileResponse struct {
+	UserID         int                     `json:"user_id"`
+	Username       string                  `json:"username"`
+	DisplayName    string                  `json:"display_name"`
+	IsAdmin        bool                    `json:"is_admin"`
+	CreatedAt      time.Time               `json:"created_at"`
+	HasAvatar      bool                    `json:"has_avatar"`
+	Spotted        int                     `json:"spotted"`
+	Collected      int                     `json:"collected"`
+	Comments       int                     `json:"comments"`
+	Fish           []models.Fish           `json:"fish"`
+	Collections    []collectedFishResponse `json:"collections"`
+	RecentComments []userCommentResponse    `json:"recent_comments"`
+}
+
+// GetPublicProfile returns a user's public profile by ID. Public endpoint.
+func (h *UserHandler) GetPublicProfile(w http.ResponseWriter, r *http.Request) {
+	idStr := chi.URLParam(r, "id")
+	id, err := strconv.Atoi(idStr)
+	if err != nil || id <= 0 {
+		http.Error(w, `{"error":"invalid user id"}`, http.StatusBadRequest)
+		return
+	}
+
+	var resp publicProfileResponse
+	resp.UserID = id
+	err = h.DB.QueryRow(
+		`SELECT username, display_name, is_admin, created_at FROM users WHERE id = $1`,
+		id,
+	).Scan(&resp.Username, &resp.DisplayName, &resp.IsAdmin, &resp.CreatedAt)
+	if err == sql.ErrNoRows {
+		http.Error(w, `{"error":"user not found"}`, http.StatusNotFound)
+		return
+	}
+	if err != nil {
+		http.Error(w, `{"error":"internal error"}`, http.StatusInternalServerError)
+		return
+	}
+
+	h.DB.QueryRow(`SELECT COUNT(*) FROM fish WHERE spotted_by = $1`, id).Scan(&resp.Spotted)
+	h.DB.QueryRow(`SELECT COUNT(*) FROM collections WHERE user_id = $1`, id).Scan(&resp.Collected)
+	h.DB.QueryRow(`SELECT COUNT(*) FROM comments WHERE user_id = $1`, id).Scan(&resp.Comments)
+	resp.HasAvatar = h.Storage.Exists(storage.AvatarKey(id))
+
+	// ── Spotted fish (newest first) ──────────────────────────────────────
+	resp.Fish = []models.Fish{}
+	if rows, err := h.DB.Query(
+		`SELECT f.id, f.photo_filename, f.latitude, f.longitude, f.address_hint,
+		        f.spotted_by, COALESCE(NULLIF(u.display_name, ''), u.username), f.created_at
+		 FROM fish f
+		 JOIN users u ON u.id = f.spotted_by
+		 WHERE f.spotted_by = $1
+		 ORDER BY f.created_at DESC
+		 LIMIT 200`, id); err == nil {
+		for rows.Next() {
+			var f models.Fish
+			if err := rows.Scan(&f.ID, &f.PhotoFilename, &f.Latitude, &f.Longitude,
+				&f.AddressHint, &f.SpottedBy, &f.SpotterName, &f.CreatedAt); err != nil {
+				continue
+			}
+			if f.PhotoFilename != "" {
+				f.PhotoURL = h.Storage.PublicURL(f.PhotoFilename)
+			}
+			resp.Fish = append(resp.Fish, f)
+		}
+		rows.Close()
+	}
+
+	// ── Collected fish (newest first) ────────────────────────────────────
+	resp.Collections = []collectedFishResponse{}
+	if rows, err := h.DB.Query(
+		`SELECT f.id, f.photo_filename, f.latitude, f.longitude, f.address_hint,
+		        COALESCE(NULLIF(u.display_name, ''), u.username), f.created_at, c.created_at
+		 FROM collections c
+		 JOIN fish f ON f.id = c.fish_id
+		 JOIN users u ON u.id = f.spotted_by
+		 WHERE c.user_id = $1
+		 ORDER BY c.created_at DESC
+		 LIMIT 200`, id); err == nil {
+		for rows.Next() {
+			var f collectedFishResponse
+			if err := rows.Scan(&f.ID, &f.PhotoFilename, &f.Latitude, &f.Longitude,
+				&f.AddressHint, &f.SpotterName, &f.CreatedAt, &f.CollectedAt); err != nil {
+				continue
+			}
+			if f.PhotoFilename != "" {
+				f.PhotoURL = h.Storage.PublicURL(f.PhotoFilename)
+			}
+			resp.Collections = append(resp.Collections, f)
+		}
+		rows.Close()
+	}
+
+	// ── Recent comments with fish context ────────────────────────────────
+	resp.RecentComments = []userCommentResponse{}
+	if rows, err := h.DB.Query(
+		`SELECT c.id, c.fish_id, c.body, c.created_at, f.photo_filename, f.address_hint
+		 FROM comments c
+		 JOIN fish f ON f.id = c.fish_id
+		 WHERE c.user_id = $1
+		 ORDER BY c.created_at DESC
+		 LIMIT 100`, id); err == nil {
+		for rows.Next() {
+			var c userCommentResponse
+			if err := rows.Scan(&c.ID, &c.FishID, &c.Body, &c.CreatedAt,
+				&c.PhotoFilename, &c.AddressHint); err != nil {
+				continue
+			}
+			if c.PhotoFilename != "" {
+				c.PhotoURL = h.Storage.PublicURL(c.PhotoFilename)
+			}
+			resp.RecentComments = append(resp.RecentComments, c)
+		}
+		rows.Close()
+	}
+
+	writeJSON(w, http.StatusOK, resp)
 }
 
 // UploadAvatar handles profile picture upload. Always replaces the old one.
