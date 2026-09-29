@@ -638,8 +638,9 @@ func (h *AdminHandler) MergeCandidates(w http.ResponseWriter, r *http.Request) {
 }
 
 // MergeFish merges the source fish (id) into the target fish.
-// Collections from source are transferred to target (duplicates skipped).
-// Source fish and its photos are deleted.
+// Collections and comments from source are transferred to target
+// (collection duplicates are skipped), the source fish's spotter gets a
+// collection on the target, then the source fish and its photos are deleted.
 func (h *AdminHandler) MergeFish(w http.ResponseWriter, r *http.Request) {
 	sourceIDStr := chi.URLParam(r, "id")
 	sourceID, err := strconv.Atoi(sourceIDStr)
@@ -664,9 +665,10 @@ func (h *AdminHandler) MergeFish(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Verify both fish exist
+	// Verify both fish exist and grab the spotters (authors).
 	var sourceFilename string
-	err = h.DB.QueryRow(`SELECT photo_filename FROM fish WHERE id = $1`, sourceID).Scan(&sourceFilename)
+	var sourceSpotter int
+	err = h.DB.QueryRow(`SELECT photo_filename, spotted_by FROM fish WHERE id = $1`, sourceID).Scan(&sourceFilename, &sourceSpotter)
 	if err == sql.ErrNoRows {
 		http.Error(w, `{"error":"source fish not found"}`, http.StatusNotFound)
 		return
@@ -676,10 +678,14 @@ func (h *AdminHandler) MergeFish(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var targetExists bool
-	h.DB.QueryRow(`SELECT EXISTS(SELECT 1 FROM fish WHERE id = $1)`, req.TargetID).Scan(&targetExists)
-	if !targetExists {
+	var targetSpotter int
+	err = h.DB.QueryRow(`SELECT spotted_by FROM fish WHERE id = $1`, req.TargetID).Scan(&targetSpotter)
+	if err == sql.ErrNoRows {
 		http.Error(w, `{"error":"target fish not found"}`, http.StatusNotFound)
+		return
+	}
+	if err != nil {
+		http.Error(w, `{"error":"internal error"}`, http.StatusInternalServerError)
 		return
 	}
 
@@ -701,6 +707,34 @@ func (h *AdminHandler) MergeFish(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Transfer comments: re-point the discussion from the source fish to the target.
+	commentRes, err := h.DB.Exec(`UPDATE comments SET fish_id = $1 WHERE fish_id = $2`, req.TargetID, sourceID)
+	if err != nil {
+		log.Printf("[ADMIN] MergeFish transfer comments error: %v", err)
+		http.Error(w, `{"error":"failed to transfer comments"}`, http.StatusInternalServerError)
+		return
+	}
+	commentsMoved, _ := commentRes.RowsAffected()
+
+	// The merged (source) fish's spotter found that fish, so give them a
+	// collection on the surviving target. Skip when they also spotted the
+	// target — collecting your own spot is not allowed.
+	authorCollected := false
+	if sourceSpotter != targetSpotter {
+		res, err := h.DB.Exec(`
+			INSERT INTO collections (fish_id, user_id)
+			VALUES ($1, $2)
+			ON CONFLICT (fish_id, user_id) DO NOTHING
+		`, req.TargetID, sourceSpotter)
+		if err != nil {
+			log.Printf("[ADMIN] MergeFish add author collection error: %v", err)
+			http.Error(w, `{"error":"failed to add author collection"}`, http.StatusInternalServerError)
+			return
+		}
+		rows, _ := res.RowsAffected()
+		authorCollected = rows > 0
+	}
+
 	// Delete source fish from DB (collections cascade)
 	_, err = h.DB.Exec(`DELETE FROM fish WHERE id = $1`, sourceID)
 	if err != nil {
@@ -720,14 +754,16 @@ func (h *AdminHandler) MergeFish(w http.ResponseWriter, r *http.Request) {
 	}
 
 	adminID, _ := r.Context().Value(middleware.ContextUserID).(int)
-	log.Printf("[ADMIN] type=merge_fish admin_id=%d source_id=%d target_id=%d collections_moved=%d",
-		adminID, sourceID, req.TargetID, collCount)
+	log.Printf("[ADMIN] type=merge_fish admin_id=%d source_id=%d target_id=%d collections_moved=%d comments_moved=%d author_collected=%t",
+		adminID, sourceID, req.TargetID, collCount, commentsMoved, authorCollected)
 
 	writeJSON(w, http.StatusOK, map[string]interface{}{
 		"message":           "fish merged",
 		"source_id":         sourceID,
 		"target_id":         req.TargetID,
 		"collections_moved": collCount,
+		"comments_moved":    commentsMoved,
+		"author_collected":  authorCollected,
 	})
 }
 
